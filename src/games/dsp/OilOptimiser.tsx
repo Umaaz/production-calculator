@@ -10,7 +10,7 @@ interface OilSolution {
   excessH: number; excessRefined: number;
 }
 
-type OilMode = 'buildings' | 'resources';
+type OilMode = 'buildings' | 'balanced' | 'resources';
 
 // ── Solver ────────────────────────────────────────────────────────────────────
 
@@ -30,7 +30,16 @@ function solveOilChain(h: number, r: number, g: number, mode: OilMode): OilSolut
     return { p, x: g, f: 0, a: 0, crudeInput: 2 * p, coalInput: 0, excessH: 0, excessRefined: 2 * h - 3 * g - r };
   }
 
-  // 'buildings' mode: minimize total machine count.
+  // 'balanced' mode: use reformed to absorb excess H from plasma (no waste), arc smelters
+  // for graphite. Trades extra coal (reformed) for less crude vs buildings. Falls through
+  // to buildings logic when r < 2h (no plasma surplus to feed reformed).
+  if (mode === 'balanced' && r >= 2 * h) {
+    const p = (r + h) / 3;
+    const f = (r - 2 * h) / 3;
+    return { p, x: 0, f, a: g, crudeInput: 2 * p, coalInput: f + 2 * g, excessH: 0, excessRefined: 0 };
+  }
+
+  // 'buildings' mode (and 'balanced' fallback when r < 2h): minimize total machine count.
   // Arc smelters are always cheaper per graphite than x-ray across all DSP speeds,
   // so x-ray is used only when the H/R balance forces it.
 
@@ -169,6 +178,10 @@ export function OilOptimiser({ refinerySpeed, defaultSmelterTierId, defaultModif
               className={`oil-mode-btn${mode === 'buildings' ? ' is-active' : ''}`}
               onClick={() => setMode('buildings')}
             >Buildings</button>
+            <button
+              className={`oil-mode-btn${mode === 'balanced' ? ' is-active' : ''}`}
+              onClick={() => setMode('balanced')}
+            >Balanced</button>
             <button
               className={`oil-mode-btn${mode === 'resources' ? ' is-active' : ''}`}
               onClick={() => setMode('resources')}
