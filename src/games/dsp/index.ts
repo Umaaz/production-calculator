@@ -289,13 +289,13 @@ const _starFuels     = ['deuterium-fuel-rod','antimatter-fuel-rod'];
 const _exchangerFuels= ['accumulator-charged'];
 
 export const PowerPlants: PowerPlant[] = [
-  { id: 'thermal',    name: 'Thermal Power Plant',       icon: '🔥', spriteId: 2204, outputKW:  1800, fuelIds: _thermalFuels },
-  { id: 'fusion',     name: 'Mini Fusion Power Station', icon: '⚛️', spriteId: 2211, outputKW:  6000, fuelIds: _fusionFuels },
-  { id: 'star',       name: 'Artificial Star',           icon: '🌟', spriteId: 2212, outputKW: 25000, fuelIds: _starFuels },
-  { id: 'exchanger',  name: 'Energy Exchanger',          icon: '🔋', spriteId: 2209, outputKW: 45000, fuelIds: _exchangerFuels },
+  { id: 'thermal',    name: 'Thermal Power Plant',       icon: '🔥', spriteId: 2204, outputKW:   2160, fuelIds: _thermalFuels },
+  { id: 'fusion',     name: 'Mini Fusion Power Station', icon: '⚛️', spriteId: 2211, outputKW: 15000, fuelIds: _fusionFuels },
+  { id: 'star',       name: 'Artificial Star',           icon: '🌟', spriteId: 2210, outputKW: 72000, fuelIds: _starFuels },
+  { id: 'exchanger',  name: 'Energy Exchanger',          icon: '🔋', spriteId: 2209, outputKW: 54000, fuelIds: _exchangerFuels },
   { id: 'wind',       name: 'Wind Turbine',              icon: '💨', spriteId: 2203, outputKW:   300, variableOutput: true },
   { id: 'solar',      name: 'Solar Panel',               icon: '☀️', spriteId: 2205, outputKW:   360, variableOutput: true },
-  { id: 'geothermal', name: 'Geothermal Station',        icon: '🌋', spriteId: 2213, outputKW:  4000 },
+  { id: 'geothermal', name: 'Geothermal Station',        icon: '🌋', spriteId: 2213, outputKW:  4800 },
 ];
 
 export const features: GameModule['features'] = { oilOptimiser: true };

@@ -2,6 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { useGameData, SpriteIcon, TierPicker, ModifierPicker } from '../../calcShared';
 import { fmt, fmtPower } from '../../treeLogic';
 
+// Spray capacity: how many input items one unit of each proliferator tier covers.
+const SPRAY_CAPS: Record<string, { label: string; spriteId: number; cap: number }> = {
+  mk1: { label: 'Mk.I',   spriteId: 1141, cap: 12 },
+  mk2: { label: 'Mk.II',  spriteId: 1142, cap: 24 },
+  mk3: { label: 'Mk.III', spriteId: 1143, cap: 60 },
+};
+const TIER_ORDER = ['mk1', 'mk2', 'mk3'];
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface OilSolution {
@@ -159,6 +167,20 @@ export function OilOptimiser({
   const coalDisplay         = coalArcDisplay + coalReformedDisplay;
 
   const isClosedLoop = sol ? (sol.crudeInput === 0 && sol.f > 0 && sol.x > 0) : false;
+
+  // Proliferator consumption: group input-items/min by tier, divide by spray capacity.
+  const prolifByTier: Record<string, { process: string; rate: number }[]> = {};
+  if (sol && showMods) {
+    const addProlif = (modId: string, process: string, itemsPerMin: number) => {
+      const tier = modId.includes('-') ? modId.split('-')[0] : null;
+      if (!tier || !SPRAY_CAPS[tier] || itemsPerMin <= 0) return;
+      if (!prolifByTier[tier]) prolifByTier[tier] = [];
+      prolifByTier[tier].push({ process, rate: itemsPerMin / SPRAY_CAPS[tier].cap });
+    };
+    if (sol.p > 0) addProlif(modifiers.plasma,   'Plasma',   crudeDisplay);
+    if (sol.f > 0) addProlif(modifiers.reformed, 'Reformed', 4 * sol.f);
+    if (sol.a > 0) addProlif(modifiers.arc,      'Arc',      coalArcDisplay);
+  }
 
   const bc = beltCapacity ?? 0;
   const beltCount = (rate: number) => bc > 0 && rate > 0 ? Math.ceil(rate / bc - 1e-9) : 0;
@@ -454,6 +476,32 @@ export function OilOptimiser({
 
             </div>
           </div>
+
+          {TIER_ORDER.some(t => prolifByTier[t]) && (
+            <div className="oil-block">
+              <div className="oil-block-title">Proliferators / min</div>
+              <div className="oil-chip-row">
+                {TIER_ORDER.filter(t => prolifByTier[t]).map(tierId => {
+                  const entries = prolifByTier[tierId];
+                  const total = entries.reduce((s, e) => s + e.rate, 0);
+                  const { label, spriteId } = SPRAY_CAPS[tierId];
+                  const detail = entries.length > 1
+                    ? entries.map(e => `${e.process} ${fmt(e.rate)}`).join(' · ')
+                    : null;
+                  return (
+                    <div key={tierId} className="oil-chip">
+                      <SpriteIcon spriteId={spriteId} fallback="🧪" size={22} />
+                      <div className="oil-chip-text">
+                        <span className="oil-chip-rate">{fmt(total)}/min</span>
+                        <span className="oil-chip-name">{label} Proliferator</span>
+                        {detail && <span className="oil-chip-detail">{detail}</span>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div className="oil-block">
             <div className="oil-block-title">Net Outputs</div>
