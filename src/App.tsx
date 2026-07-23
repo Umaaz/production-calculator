@@ -83,6 +83,7 @@ function App() {
 
   return (
     <ProductionCalculator
+      gameId={gameId}
       gameData={gameData}
       gameLabel={game?.label ?? gameId ?? ''}
       gameIcon={game?.icon ?? '🏭'}

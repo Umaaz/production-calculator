@@ -1,4 +1,5 @@
 import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { usePersisted, usePersistedPathMap } from './usePersisted';
 import ReactDOM from 'react-dom';
 import type { ProdRecipe, ProdItem, GameData } from './gameTypes';
 import {
@@ -331,42 +332,45 @@ function TreeRow({ node, depth, expanded, toggle }: {
 
 const OIL_CHAIN_ITEM_IDS = new Set(['hydrogen', 'refined-oil', 'energetic-graphite']);
 
-export function ProductionCalculator({ gameData, gameLabel, gameIcon, onBack }: {
-  gameData: GameData; gameLabel: string; gameIcon: string; onBack: () => void;
+export function ProductionCalculator({ gameId, gameData, gameLabel, gameIcon, onBack }: {
+  gameId: string; gameData: GameData; gameLabel: string; gameIcon: string; onBack: () => void;
 }) {
   const { itemById, craftableItems, recipesByOutput, recipeByOutput, machineTiers, machines, beltTiers, sorterTiers, modifierOptions, features } = gameData;
 
   const tierCats = Object.keys(machineTiers).filter(cat => cat !== 'raw' && machineTiers[cat].length > 1);
 
-  const [targetId, setTargetId] = useState(craftableItems[0]?.id ?? '');
-  const [rateStr, setRateStr]   = useState('60');
+  // Namespace every persisted key by game so switching games doesn't bleed state.
+  const K = (suffix: string) => `pcalc:${gameId}:${suffix}`;
+
+  const [targetId, setTargetId] = usePersisted(K('targetId'), craftableItems[0]?.id ?? '');
+  const [rateStr, setRateStr]   = usePersisted(K('rateStr'), '60');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
-  const [defaultTierIds, setDefaultTierIds] = useState<Record<string, string>>(() => {
+  const [defaultTierIds, setDefaultTierIds] = usePersisted<Record<string, string>>(K('defaultTierIds'), () => {
     const d: Record<string, string> = {};
     for (const cat of Object.keys(machineTiers)) d[cat] = machineTiers[cat][0].id;
     return d;
   });
 
-  const [activeTab, setActiveTab] = useState<'tree' | 'oil'>('tree');
+  const [activeTab, setActiveTab] = usePersisted<'tree' | 'oil'>(K('activeTab'), 'tree');
 
-  const [selectedBeltId, setSelectedBeltId] = useState(beltTiers[0]?.id ?? '');
+  const [selectedBeltId, setSelectedBeltId] = usePersisted(K('selectedBeltId'), beltTiers[0]?.id ?? '');
   // sorterTierId kept for future sorter-placement feature; not yet used in tree calculations
   const [selectedSorterId] = useState(sorterTiers[0]?.id ?? '');
   void selectedSorterId;
 
   const defaultModifierId = modifierOptions[0]?.id ?? 'none';
-  const [itemTierIds,      setTier,      clearTier]      = usePathMap<string>();
-  const [itemModifierIds,  setModifier,  clearModifier]  = usePathMap<string>();
-  const [selectedRecipes,  setRecipe,    clearRecipe]    = usePathMap<string>();
-  const [defaultRecipeIds, setDefaultRecipeIds] = useState<Record<string, string>>({});
-  const [currentDefaultModifierId, setDefaultModifierId] = useState(defaultModifierId);
+  const [itemTierIds,      setTier,      clearTier]      = usePersistedPathMap<string>(K('itemTierIds'));
+  const [itemModifierIds,  setModifier,  clearModifier]  = usePersistedPathMap<string>(K('itemModifierIds'));
+  const [selectedRecipes,  setRecipe,    clearRecipe]    = usePersistedPathMap<string>(K('selectedRecipes'));
+  const [defaultRecipeIds, setDefaultRecipeIds] = usePersisted<Record<string, string>>(K('defaultRecipeIds'), {});
+  const [currentDefaultModifierId, setDefaultModifierId] = usePersisted(K('defaultModifierId'), defaultModifierId);
 
   // Oil chain config — shared between the oil tab and the tree's oil chain entry.
-  const [oilMode, setOilMode] = useState<OilMode>('buildings');
-  const [oilSmelterTierId, setOilSmelterTierId] = useState(machineTiers['smelter']?.[0]?.id ?? '');
-  const [oilDefaultModifierId, setOilDefaultModifierId] = useState(defaultModifierId);
-  const [oilModifierOverrides, setOilModifierOverrides] = useState<Partial<OilModifiers>>({});
+  const [oilMode, setOilMode] = usePersisted<OilMode>(K('oilMode'), 'buildings');
+  const [oilSmelterTierId, setOilSmelterTierId] = usePersisted(K('oilSmelterTierId'), machineTiers['smelter']?.[0]?.id ?? '');
+  const [oilDefaultModifierId, setOilDefaultModifierId] = usePersisted(K('oilDefaultModifierId'), defaultModifierId);
+  const [oilModifierOverrides, setOilModifierOverrides] = usePersisted<Partial<OilModifiers>>(K('oilModifierOverrides'), {});
   const oilModifiers = useMemo<OilModifiers>(() => ({
     plasma:   oilModifierOverrides.plasma   ?? oilDefaultModifierId,
     xray:     oilModifierOverrides.xray     ?? oilDefaultModifierId,
