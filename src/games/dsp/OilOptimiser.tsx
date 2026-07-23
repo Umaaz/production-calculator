@@ -62,12 +62,11 @@ export function solveOilChain(h: number, r: number, g: number, mode: OilMode): O
 export function buildMults(modifierOptions: import('../../gameTypes').ModifierOption[], modifiers: OilModifiers) {
   const get = (id: string) => modifierOptions.find(m => m.id === id) ?? modifierOptions[0];
   const pm = get(modifiers.plasma);
-  const xm = get(modifiers.xray);
   const rm = get(modifiers.reformed);
   const am = get(modifiers.arc);
   return {
     plasma:   { full: (pm?.speedMult ?? 1) * (pm?.productivityMult ?? 1), prod: pm?.productivityMult ?? 1, power: pm?.powerMult ?? 1 },
-    xray:     { full: xm?.speedMult ?? 1, power: xm?.powerMult ?? 1 },
+    xray:     { full: 1, power: 1 },
     reformed: { full: rm?.speedMult ?? 1, power: rm?.powerMult ?? 1 },
     arc:      { full: (am?.speedMult ?? 1) * (am?.productivityMult ?? 1), prod: am?.productivityMult ?? 1, power: am?.powerMult ?? 1 },
   };
@@ -303,7 +302,6 @@ export function OilOptimiser({
                     <SpriteIcon spriteId={2308} fallback="🛢" size={16} />
                     X-Ray Cracking
                   </div>
-                  {showMods && <div className="oil-process-modifier"><ModPicker building="xray" opts={speedOnly} /></div>}
                   <div className="oil-process-count">
                     {refsXray(sol.x).ceil}×
                     <span className="oil-process-exact"> ({fmt(refsXray(sol.x).exact)})</span>
@@ -669,7 +667,7 @@ export function OilChainTreeEntry({
               <span className="tree-cell tree-cell-rate" />
               <span className="tree-cell tree-cell-recipe" />
               <span className="tree-cell tree-cell-machine"><span className="tree-machine-name">{refLabel}</span></span>
-              {modCell('xray', speedOnly)}
+              <span className="tree-cell tree-cell-prolif" />
               <span className="tree-cell tree-cell-count">
                 <span className="tree-machine-count">{refsXray(solution.x).ceil}×<span className="tree-machine-exact"> ({fmt(refsXray(solution.x).exact)})</span></span>
               </span>
