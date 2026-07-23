@@ -16,12 +16,6 @@ import type { OilMode, OilModifiers } from './games/dsp/OilOptimiser';
 // ── Path-keyed state map ──────────────────────────────────────────────────────
 // Shared pattern for tier, modifier, and recipe per-path overrides.
 
-function usePathMap<T>(): [Record<string, T>, (path: string, val: T) => void, (path: string) => void] {
-  const [map, setMap] = useState<Record<string, T>>({});
-  const set   = useCallback((path: string, val: T) => setMap(prev => ({ ...prev, [path]: val })), []);
-  const clear = useCallback((path: string) => setMap(prev => { const n = { ...prev }; delete n[path]; return n; }), []);
-  return [map, set, clear];
-}
 
 // ── Tree actions context ──────────────────────────────────────────────────────
 // Avoids prop-drilling callbacks and per-path overrides 12 levels through TreeRow.
@@ -383,9 +377,9 @@ export function ProductionCalculator({ gameId, gameData, gameLabel, gameIcon, on
     arc:      oilModifierOverrides.arc      ?? oilDefaultModifierId,
   }), [oilDefaultModifierId, oilModifierOverrides]);
   const setOilModifier = useCallback((b: keyof OilModifiers, id: string) =>
-    setOilModifierOverrides(prev => ({ ...prev, [b]: id })), []);
+    setOilModifierOverrides(prev => ({ ...prev, [b]: id })), [setOilModifierOverrides]);
   const clearOilModifier = useCallback((b: keyof OilModifiers) =>
-    setOilModifierOverrides(prev => { const n = { ...prev }; delete n[b]; return n; }), []);
+    setOilModifierOverrides(prev => { const n = { ...prev }; delete n[b]; return n; }), [setOilModifierOverrides]);
 
   const setDefaultTier   = (cat: string, tierId: string) =>
     setDefaultTierIds(prev => ({ ...prev, [cat]: tierId }));

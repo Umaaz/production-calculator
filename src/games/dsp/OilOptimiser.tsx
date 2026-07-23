@@ -516,7 +516,6 @@ export function OilChainTreeEntry({
 
   const crudeDisplay    = solution.crudeInput / mults.plasma.prod;
   const coalArcDisplay  = 2 * solution.a / mults.arc.prod;
-  const coalDisplay     = solution.f + coalArcDisplay;
   const refSprite = machineTiers['refinery']?.[0]?.spriteId;
   const refLabel  = machines['refinery']?.name ?? 'Refinery';
 
@@ -563,27 +562,6 @@ export function OilChainTreeEntry({
     );
   };
 
-  const rawRow = (id: string, rate: number) => {
-    if (rate <= 0) return null;
-    const item = itemById[id];
-    return (
-      <div key={id} className="tree-row">
-        <span className="tree-cell tree-cell-item" style={{ paddingLeft: 8 + 22 }}>
-          <span className="tree-caret leaf">•</span>
-          <SpriteIcon spriteId={item?.spriteId} fallback={item?.icon ?? '❓'} size={22} className="tree-icon" />
-          <span className="tree-name">{item?.name ?? id}</span>
-        </span>
-        <span className="tree-cell tree-cell-rate">{fmt(rate)}/min</span>
-        <span className="tree-cell tree-cell-recipe" />
-        <span className="tree-cell tree-cell-machine"><span className="tree-tag raw">raw resource</span></span>
-        <span className="tree-cell tree-cell-prolif" />
-        <span className="tree-cell tree-cell-count" />
-        <span className="tree-cell tree-cell-power" />
-        {beltCell(rate)}
-        <span className="tree-cell tree-cell-byproducts" />
-      </div>
-    );
-  };
 
   const outputRow = (id: string, rate: number, excess = false) => {
     if (rate <= 0) return null;
