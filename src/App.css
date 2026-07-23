@@ -1401,3 +1401,84 @@ body, html, #root {
 }
 .oil-io-in  { color: #c06060; }
 .oil-io-out { color: #60a060; }
+
+/* ── Flow Analysis cards ─────────────────────────────────────────── */
+.oil-flow-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.oil-flow-card {
+  background: #12122a;
+  border: 1px solid #2a2a50;
+  border-radius: 6px;
+  padding: 10px 12px;
+  min-width: 240px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.oil-flow-card-hdr {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 2px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #c0c0e0;
+}
+.oil-flow-card-count {
+  font-size: 14px;
+  font-weight: 700;
+  color: #a0a0ff;
+  font-variant-numeric: tabular-nums;
+}
+/* Section header inside a card */
+.oil-flow-section {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #33335a;
+  font-weight: 700;
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid #1e1e3a;
+}
+.oil-flow-section:first-of-type { margin-top: 0; border-top: none; padding-top: 0; }
+/* Flow row */
+.oil-fr {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  padding: 1px 0;
+}
+.oil-fr-loop {
+  background: rgba(150, 120, 10, 0.08);
+  border-radius: 3px;
+  padding: 1px 3px;
+  margin: 0 -3px;
+}
+.oil-fr-sign {
+  width: 14px;
+  flex-shrink: 0;
+  font-weight: 700;
+  font-size: 12px;
+  text-align: center;
+}
+.oil-fr-in   .oil-fr-sign { color: #e08060; }
+.oil-fr-out  .oil-fr-sign { color: #7fd18f; }
+.oil-fr-loop .oil-fr-sign { color: #c8a020; }
+.oil-fr-name { color: #b0b0d8; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.oil-fr-loop .oil-fr-name { color: #c8a020; }
+.oil-fr-rate { color: #8080b8; }
+.oil-fr-in   .oil-fr-rate { color: #e08060; }
+.oil-fr-out  .oil-fr-rate { color: #7fd18f; }
+.oil-fr-loop .oil-fr-rate { color: #c8a020; }
+.oil-fr-belts { color: #8ab4d4; font-weight: 600; }
+.oil-fr-loop .oil-fr-belts { color: #b89030; }
+.oil-fr-label { color: #55558a; font-size: 10px; }
+.oil-fr-label-loop { color: #7a6010; font-size: 10px; font-style: italic; }

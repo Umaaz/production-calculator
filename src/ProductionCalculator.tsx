@@ -531,6 +531,7 @@ export function ProductionCalculator({ gameId, gameData, gameLabel, gameIcon, on
           <OilOptimiser
             refinerySpeed={(machineTiers['refinery']?.find(t => t.id === defaultTierIds['refinery']) ?? machineTiers['refinery']?.[0])?.speed ?? 1}
             treeDemands={oilDemands}
+            beltCapacity={beltCapacity}
             mode={oilMode}
             onModeChange={setOilMode}
             smelterTierId={oilSmelterTierId}

@@ -106,7 +106,7 @@ function OilIoLine({ itemId, rate, sign }: { itemId: string; rate: number; sign:
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function OilOptimiser({
-  refinerySpeed, treeDemands,
+  refinerySpeed, treeDemands, beltCapacity,
   mode, onModeChange,
   smelterTierId, onSmelterTierChange,
   defaultModifierId, onDefaultModifierChange,
@@ -114,6 +114,7 @@ export function OilOptimiser({
 }: {
   refinerySpeed: number;
   treeDemands: { h: number; r: number; g: number };
+  beltCapacity?: number;
   mode: OilMode;
   onModeChange: (m: OilMode) => void;
   smelterTierId: string;
@@ -157,6 +158,46 @@ export function OilOptimiser({
   const coalArcDisplay      = sol ? 2 * sol.a / mults.arc.prod : 0;
   const coalReformedDisplay = sol ? sol.f : 0;
   const coalDisplay         = coalArcDisplay + coalReformedDisplay;
+
+  const isClosedLoop = sol ? (sol.crudeInput === 0 && sol.f > 0 && sol.x > 0) : false;
+
+  const bc = beltCapacity ?? 0;
+  const beltCount = (rate: number) => bc > 0 && rate > 0 ? Math.ceil(rate / bc - 1e-9) : 0;
+
+  // One belt-connection row inside a flow card.
+  // dir='loop' is used for the recycle belt; it always appears in BOTH the
+  // inputs and outputs block of the same card so the player sees it as a
+  // physical belt that exits the machines and immediately feeds back in.
+  const FlowRow = ({ dir, itemId, rate, from, to }: {
+    dir: 'in' | 'out' | 'loop-in' | 'loop-out';
+    itemId: string;
+    rate: number;
+    from?: string;  // source label for 'in' rows
+    to?: string;    // destination label for 'out' rows
+  }) => {
+    if (rate <= 0) return null;
+    const itm = itemById[itemId];
+    const n = beltCount(rate);
+    const isLoop = dir === 'loop-in' || dir === 'loop-out';
+    const sign = dir === 'in' ? '←' : dir === 'out' ? '→' : '↺';
+    const dest = dir === 'in' ? from : dir === 'out' ? to
+               : dir === 'loop-in' ? 'loop belt (from own output)'
+               : 'loop belt (back to own input)';
+    return (
+      <div className={`oil-fr oil-fr-${isLoop ? 'loop' : dir}`}>
+        <span className="oil-fr-sign">{sign}</span>
+        <SpriteIcon spriteId={itm?.spriteId} fallback={itm?.icon ?? '?'} size={13} />
+        <span className="oil-fr-name">{itm?.name ?? itemId}</span>
+        <span className="oil-fr-rate">{fmt(rate)}/min</span>
+        {n > 0 && <span className="oil-fr-belts">{n}×</span>}
+        {dest && <span className={`oil-fr-label${isLoop ? ' oil-fr-label-loop' : ''}`}>{dest}</span>}
+      </div>
+    );
+  };
+
+  const FlowSection = ({ title }: { title: string }) => (
+    <div className="oil-flow-section">{title}</div>
+  );
 
   const demands = [
     { id: 'hydrogen',           label: 'Hydrogen',           val: hStr, set: setHStr },
@@ -325,6 +366,96 @@ export function OilOptimiser({
               </div>
             </div>
           )}
+
+          {/* ── Flow Analysis ─────────────────────────────────── */}
+          <div className="oil-block">
+            <div className="oil-block-title">Flow Analysis</div>
+            <div className="oil-flow-cards">
+
+              {/* Plasma */}
+              {sol.p > 0 && (() => {
+                const pp     = mults.plasma.prod;
+                const pH     = sol.p / pp;
+                const pR     = 2 * sol.p / pp;
+                const hToRef = !isClosedLoop ? sol.f : 0;
+                const rToX   = !isClosedLoop ? sol.x : 0;
+                const hToBus = Math.max(0, pH - hToRef);
+                const rToBus = Math.max(0, pR - rToX);
+                return (
+                  <div key="plasma" className="oil-flow-card">
+                    <div className="oil-flow-card-hdr">
+                      <span>Plasma Refining</span>
+                      <span className="oil-flow-card-count">{refsPlasma(sol.p).ceil}×</span>
+                    </div>
+                    <FlowSection title="inputs" />
+                    <FlowRow dir="in" itemId="crude-oil" rate={crudeDisplay} from="external" />
+                    <FlowSection title="outputs" />
+                    {hToRef > 0 && <FlowRow dir="out" itemId="hydrogen"    rate={hToRef} to="Reformed Ref." />}
+                    {hToBus > 0 && <FlowRow dir="out" itemId="hydrogen"    rate={hToBus} to="H bus" />}
+                    {rToX   > 0 && <FlowRow dir="out" itemId="refined-oil" rate={rToX}   to="X-Ray Cracking" />}
+                    {rToBus > 0 && <FlowRow dir="out" itemId="refined-oil" rate={rToBus} to="R bus" />}
+                  </div>
+                );
+              })()}
+
+              {/* X-Ray */}
+              {sol.x > 0 && (() => {
+                const rFrom = isClosedLoop ? 'Reformed Ref.' : 'Plasma Refining';
+                const hTo   = isClosedLoop ? 'Reformed Ref.' : 'H bus';
+                return (
+                  <div key="xray" className="oil-flow-card">
+                    <div className="oil-flow-card-hdr">
+                      <span>X-Ray Cracking</span>
+                      <span className="oil-flow-card-count">{refsXray(sol.x).ceil}×</span>
+                    </div>
+                    <FlowSection title="inputs" />
+                    <FlowRow dir="in"      itemId="refined-oil" rate={sol.x}     from={rFrom} />
+                    <FlowRow dir="loop-in" itemId="hydrogen"    rate={2 * sol.x} />
+                    <FlowSection title="outputs" />
+                    <FlowRow dir="out"      itemId="energetic-graphite" rate={sol.x}     to="factory output" />
+                    <FlowRow dir="loop-out" itemId="hydrogen"            rate={2 * sol.x} />
+                    <FlowRow dir="out"      itemId="hydrogen"            rate={sol.x}     to={hTo} />
+                  </div>
+                );
+              })()}
+
+              {/* Reformed */}
+              {sol.f > 0 && (() => {
+                const hFrom = isClosedLoop ? 'X-Ray Cracking' : 'Plasma Refining';
+                const rTo   = isClosedLoop ? 'X-Ray Cracking' : 'R bus';
+                return (
+                  <div key="reformed" className="oil-flow-card">
+                    <div className="oil-flow-card-hdr">
+                      <span>Reformed Ref.</span>
+                      <span className="oil-flow-card-count">{refsReformed(sol.f).ceil}×</span>
+                    </div>
+                    <FlowSection title="inputs" />
+                    <FlowRow dir="in"      itemId="hydrogen"    rate={sol.f} from={hFrom} />
+                    <FlowRow dir="in"      itemId="coal"        rate={sol.f} from="external" />
+                    <FlowRow dir="loop-in" itemId="refined-oil" rate={2 * sol.f} />
+                    <FlowSection title="outputs" />
+                    <FlowRow dir="loop-out" itemId="refined-oil" rate={2 * sol.f} />
+                    <FlowRow dir="out"      itemId="refined-oil" rate={sol.f}     to={rTo} />
+                  </div>
+                );
+              })()}
+
+              {/* Arc */}
+              {sol.a > 0 && (
+                <div key="arc" className="oil-flow-card">
+                  <div className="oil-flow-card-hdr">
+                    <span>Arc Smelting</span>
+                    <span className="oil-flow-card-count">{refsArc(sol.a).ceil}×</span>
+                  </div>
+                  <FlowSection title="inputs" />
+                  <FlowRow dir="in"  itemId="coal"               rate={coalArcDisplay}         from="external" />
+                  <FlowSection title="outputs" />
+                  <FlowRow dir="out" itemId="energetic-graphite" rate={sol.a / mults.arc.prod} to="factory output" />
+                </div>
+              )}
+
+            </div>
+          </div>
 
           <div className="oil-block">
             <div className="oil-block-title">Net Outputs</div>
