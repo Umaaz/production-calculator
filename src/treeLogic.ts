@@ -52,6 +52,7 @@ export interface TreeNode {
   manuallyMined: boolean;
   recipeOverridden: boolean;
   modifierId: string;
+  oilOptimised: boolean;
 }
 
 export interface TreeBuildConfig {
@@ -65,6 +66,7 @@ export interface TreeBuildConfig {
   recipesByOutput: Record<string, ProdRecipe[]>;
   machineTiers: Record<string, MachineTier[]>;
   modifierOptions: ModifierOption[];
+  oilChainItemIds?: Set<string>;
 }
 
 export function buildTree(
@@ -87,9 +89,19 @@ export function buildTree(
 
   const modifierId = cfg.itemModifierIds[path] ?? cfg.defaultModifierId;
 
+  // Items managed by the oil optimiser stop the tree here.
+  if (cfg.oilChainItemIds?.has(itemId)) {
+    return {
+      itemId, rate, recipe: null, machine: null, tierId: null, machines: 0,
+      byproducts: [], children: [], path, cyclic: false, manuallyMined: false,
+      recipeOverridden: false, modifierId, oilOptimised: true,
+    };
+  }
+
   const noRecipeNode = (cyclic: boolean): TreeNode => ({
     itemId, rate, recipe: null, machine: null, tierId: null, machines: 0,
     byproducts: [], children: [], path, cyclic, manuallyMined, recipeOverridden, modifierId,
+    oilOptimised: false,
   });
 
   if (!recipe || ancestors.has(itemId)) return noRecipeNode(!!recipe && ancestors.has(itemId));
@@ -130,6 +142,7 @@ export function buildTree(
   return {
     itemId, rate, recipe, machine: recipe.machine, tierId: tier.id,
     machines, byproducts, children, path, cyclic: false, manuallyMined: false, recipeOverridden, modifierId,
+    oilOptimised: false,
   };
 }
 
@@ -148,7 +161,10 @@ export interface Totals {
 
 export function aggregate(node: TreeNode, totals: Totals) {
   if (!node.recipe) {
-    totals.raw[node.itemId] = (totals.raw[node.itemId] ?? 0) + node.rate;
+    // Oil-optimised leaves are accounted for by the oil chain entry, not the raw summary.
+    if (!node.oilOptimised) {
+      totals.raw[node.itemId] = (totals.raw[node.itemId] ?? 0) + node.rate;
+    }
     return;
   }
   if (node.tierId) {

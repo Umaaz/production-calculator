@@ -9,7 +9,8 @@ import {
   collectPaths, findTier, buildTree, aggregate, fmt,
   type TreeNode, type TreeBuildConfig, type Totals,
 } from './treeLogic';
-import { OilOptimiser } from './games/dsp/OilOptimiser';
+import { OilOptimiser, OilChainTreeEntry, solveOilChain } from './games/dsp/OilOptimiser';
+import type { OilMode, OilModifiers } from './games/dsp/OilOptimiser';
 
 // ── Path-keyed state map ──────────────────────────────────────────────────────
 // Shared pattern for tier, modifier, and recipe per-path overrides.
@@ -201,9 +202,11 @@ function TreeRow({ node, depth, expanded, toggle }: {
     : modifierOptions;
 
   const realRecipes = recipesByOutput[node.itemId] ?? [];
-  const pickerRecipes: ProdRecipe[] | null = item?.canBeRaw
-    ? [...realRecipes, MINE_PSEUDO_RECIPE(node.itemId)]
-    : realRecipes.length > 1 ? realRecipes : null;
+  const pickerRecipes: ProdRecipe[] | null = node.oilOptimised ? null : (
+    item?.canBeRaw
+      ? [...realRecipes, MINE_PSEUDO_RECIPE(node.itemId)]
+      : realRecipes.length > 1 ? realRecipes : null
+  );
   const pickerSelectedId = node.recipe?.id ?? (node.manuallyMined ? '__mine__' : (pickerRecipes?.[0]?.id ?? ''));
 
   const beltExact = node.rate / beltCapacity;
@@ -263,6 +266,8 @@ function TreeRow({ node, depth, expanded, toggle }: {
                 <button className="tree-reset-btn" onClick={() => clearTier(node.path)} title="Reset to default tier">↺</button>
               )}
             </>
+          ) : node.oilOptimised ? (
+            <span className="tree-tag oil">⚗ Oil Chain</span>
           ) : node.cyclic ? (
             <span className="tree-tag cyclic">↻ cyclic</span>
           ) : node.manuallyMined ? (
@@ -324,6 +329,8 @@ function TreeRow({ node, depth, expanded, toggle }: {
 
 // ── Main calculator ───────────────────────────────────────────────────────────
 
+const OIL_CHAIN_ITEM_IDS = new Set(['hydrogen', 'refined-oil', 'energetic-graphite']);
+
 export function ProductionCalculator({ gameData, gameLabel, gameIcon, onBack }: {
   gameData: GameData; gameLabel: string; gameIcon: string; onBack: () => void;
 }) {
@@ -355,6 +362,22 @@ export function ProductionCalculator({ gameData, gameLabel, gameIcon, onBack }: 
   const [defaultRecipeIds, setDefaultRecipeIds] = useState<Record<string, string>>({});
   const [currentDefaultModifierId, setDefaultModifierId] = useState(defaultModifierId);
 
+  // Oil chain config — shared between the oil tab and the tree's oil chain entry.
+  const [oilMode, setOilMode] = useState<OilMode>('buildings');
+  const [oilSmelterTierId, setOilSmelterTierId] = useState(machineTiers['smelter']?.[0]?.id ?? '');
+  const [oilDefaultModifierId, setOilDefaultModifierId] = useState(defaultModifierId);
+  const [oilModifierOverrides, setOilModifierOverrides] = useState<Partial<OilModifiers>>({});
+  const oilModifiers = useMemo<OilModifiers>(() => ({
+    plasma:   oilModifierOverrides.plasma   ?? oilDefaultModifierId,
+    xray:     oilModifierOverrides.xray     ?? oilDefaultModifierId,
+    reformed: oilModifierOverrides.reformed ?? oilDefaultModifierId,
+    arc:      oilModifierOverrides.arc      ?? oilDefaultModifierId,
+  }), [oilDefaultModifierId, oilModifierOverrides]);
+  const setOilModifier = useCallback((b: keyof OilModifiers, id: string) =>
+    setOilModifierOverrides(prev => ({ ...prev, [b]: id })), []);
+  const clearOilModifier = useCallback((b: keyof OilModifiers) =>
+    setOilModifierOverrides(prev => { const n = { ...prev }; delete n[b]; return n; }), []);
+
   const setDefaultTier   = (cat: string, tierId: string) =>
     setDefaultTierIds(prev => ({ ...prev, [cat]: tierId }));
   const setDefaultRecipe = (id: string, recipeId: string) =>
@@ -370,6 +393,7 @@ export function ProductionCalculator({ gameData, gameLabel, gameIcon, onBack }: 
       defaultTierIds, itemTierIds, selectedRecipes, defaultRecipeIds,
       defaultModifierId: currentDefaultModifierId, itemModifierIds,
       itemById, recipesByOutput, machineTiers, modifierOptions,
+      oilChainItemIds: features.oilOptimiser ? OIL_CHAIN_ITEM_IDS : undefined,
     };
     return buildTree(targetId, rate, cfg, new Set(), '');
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -401,10 +425,26 @@ export function ProductionCalculator({ gameData, gameLabel, gameIcon, onBack }: 
   }, [tree]);
 
   const oilDemands = useMemo(() => {
-    const sum = (id: string) => Object.values(totals?.crafted ?? {})
-      .filter(e => e.itemId === id).reduce((s, e) => s + e.rate, 0);
-    return { h: sum('hydrogen'), r: sum('refined-oil'), g: sum('energetic-graphite') };
-  }, [totals]);
+    const demands = { h: 0, r: 0, g: 0 };
+    if (!tree || !features.oilOptimiser) return demands;
+    const walk = (node: TreeNode) => {
+      if (node.oilOptimised) {
+        if (node.itemId === 'hydrogen')            demands.h += node.rate;
+        else if (node.itemId === 'refined-oil')    demands.r += node.rate;
+        else if (node.itemId === 'energetic-graphite') demands.g += node.rate;
+      }
+      node.children.forEach(walk);
+    };
+    walk(tree);
+    return demands;
+  }, [tree, features.oilOptimiser]);
+
+  const treeOilSolution = useMemo(() => {
+    if (!features.oilOptimiser) return null;
+    const { h, r, g } = oilDemands;
+    if (h + r + g === 0) return null;
+    return solveOilChain(h, r, g, oilMode);
+  }, [features.oilOptimiser, oilDemands, oilMode]);
 
   // Expand all nodes whenever tree structure changes (not just tier/modifier tweaks).
   const structuralKey = `${targetId}:${rate}:${JSON.stringify(selectedRecipes)}:${JSON.stringify(defaultRecipeIds)}`;
@@ -448,9 +488,17 @@ export function ProductionCalculator({ gameData, gameLabel, gameIcon, onBack }: 
         {activeTab === 'oil' && features.oilOptimiser ? (
           <OilOptimiser
             refinerySpeed={(machineTiers['refinery']?.find(t => t.id === defaultTierIds['refinery']) ?? machineTiers['refinery']?.[0])?.speed ?? 1}
-            defaultSmelterTierId={defaultTierIds['smelter'] ?? ''}
-            defaultModifierId={currentDefaultModifierId}
             treeDemands={oilDemands}
+            mode={oilMode}
+            onModeChange={setOilMode}
+            smelterTierId={oilSmelterTierId}
+            onSmelterTierChange={setOilSmelterTierId}
+            defaultModifierId={oilDefaultModifierId}
+            onDefaultModifierChange={setOilDefaultModifierId}
+            modifiers={oilModifiers}
+            overrides={oilModifierOverrides}
+            onModifierChange={setOilModifier}
+            onModifierClear={clearOilModifier}
           />
         ) : (
         <><div id="calc-controls">
@@ -526,6 +574,19 @@ export function ProductionCalculator({ gameData, gameLabel, gameIcon, onBack }: 
               <TreeActionsCtx.Provider value={treeActions}>
               <div className="tree-scroll">
                 <TreeRow node={tree} depth={0} expanded={expanded} toggle={toggleNode} />
+                {treeOilSolution && (
+                  <OilChainTreeEntry
+                    solution={treeOilSolution}
+                    refinerySpeed={(machineTiers['refinery']?.find(t => t.id === defaultTierIds['refinery']) ?? machineTiers['refinery']?.[0])?.speed ?? 1}
+                    smelterTierId={oilSmelterTierId}
+                    defaultModifierId={oilDefaultModifierId}
+                    onDefaultModifierChange={setOilDefaultModifierId}
+                    modifiers={oilModifiers}
+                    overrides={oilModifierOverrides}
+                    onModifierChange={setOilModifier}
+                    onModifierClear={clearOilModifier}
+                  />
+                )}
               </div>
               </TreeActionsCtx.Provider>
             </div>

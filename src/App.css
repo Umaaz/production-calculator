@@ -873,6 +873,7 @@ body, html, #root {
 }
 .tree-tag.raw { color: #c99; background: rgba(160,90,60,0.14); }
 .tree-tag.cyclic { color: #cc9; background: rgba(160,160,60,0.14); }
+.tree-tag.oil { color: #88bbff; background: rgba(60,90,160,0.18); }
 
 .tree-byproducts {
   font-size: 11px;
@@ -1275,6 +1276,11 @@ body, html, #root {
   font-size: 12px;
   font-weight: 700;
   color: #c0c0e0;
+}
+.oil-process-modifier {
+  display: flex;
+  align-items: center;
+  padding: 2px 0 4px;
 }
 .oil-process-count {
   font-size: 18px;
