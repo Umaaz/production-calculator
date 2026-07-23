@@ -134,8 +134,8 @@ export const ItemRecipes: ProdRecipe[] = [
 
   // Refining (co-products / feedback loops)
   { id: 'r-plasma-refining', machine: 'refinery', time: 4, label: 'Plasma Refining',     outputs: [{ item: 'refined-oil', qty: 2 }, { item: 'hydrogen', qty: 1 }],          inputs: [{ item: 'crude-oil', qty: 2 }] },
-  { id: 'r-xray-cracking',   machine: 'refinery', time: 4, label: 'X-Ray Cracking',      outputs: [{ item: 'energetic-graphite', qty: 1 }, { item: 'hydrogen', qty: 3 }],    inputs: [{ item: 'refined-oil', qty: 1 }, { item: 'hydrogen', qty: 2 }] },
-  { id: 'r-reformed-refine', machine: 'refinery', time: 4, label: 'Reformed Refinement', outputs: [{ item: 'refined-oil', qty: 3 }],                                          inputs: [{ item: 'refined-oil', qty: 2 }, { item: 'hydrogen', qty: 1 }, { item: 'coal', qty: 1 }] },
+  { id: 'r-xray-cracking',   machine: 'refinery', time: 4, label: 'X-Ray Cracking',      noExtraProducts: true, outputs: [{ item: 'energetic-graphite', qty: 1 }, { item: 'hydrogen', qty: 3 }],    inputs: [{ item: 'refined-oil', qty: 1 }, { item: 'hydrogen', qty: 2 }] },
+  { id: 'r-reformed-refine', machine: 'refinery', time: 4, label: 'Reformed Refinement', noExtraProducts: true, outputs: [{ item: 'refined-oil', qty: 3 }],                                          inputs: [{ item: 'refined-oil', qty: 2 }, { item: 'hydrogen', qty: 1 }, { item: 'coal', qty: 1 }] },
 
   // Chemical
   { id: 'r-plastic',         machine: 'chemical', time: 3, outputs: [{ item: 'plastic',         qty: 1 }], inputs: [{ item: 'refined-oil', qty: 2 }, { item: 'energetic-graphite', qty: 1 }] },
@@ -145,8 +145,8 @@ export const ItemRecipes: ProdRecipe[] = [
   { id: 'r-carbon-nanotube', machine: 'chemical', time: 4, outputs: [{ item: 'carbon-nanotube', qty: 2 }], inputs: [{ item: 'graphene', qty: 3 }, { item: 'titanium-ingot', qty: 1 }] },
 
   // Collider
-  { id: 'r-strange-matter', machine: 'collider', time: 8, outputs: [{ item: 'strange-matter', qty: 1 }],                        inputs: [{ item: 'particle-container', qty: 2 }, { item: 'iron-ingot', qty: 2 }, { item: 'deuterium', qty: 10 }] },
-  { id: 'r-antimatter',     machine: 'collider', time: 2, outputs: [{ item: 'antimatter', qty: 2 }, { item: 'hydrogen', qty: 2 }], inputs: [{ item: 'critical-photon', qty: 2 }] },
+  { id: 'r-strange-matter', machine: 'collider', time: 8, noExtraProducts: true, outputs: [{ item: 'strange-matter', qty: 1 }],                        inputs: [{ item: 'particle-container', qty: 2 }, { item: 'iron-ingot', qty: 2 }, { item: 'deuterium', qty: 10 }] },
+  { id: 'r-antimatter',     machine: 'collider', time: 2, noExtraProducts: true, outputs: [{ item: 'antimatter', qty: 2 }, { item: 'hydrogen', qty: 2 }], inputs: [{ item: 'critical-photon', qty: 2 }] },
 
   // Alternate recipes
   { id: 'r-diamond-kim',           machine: 'smelter',   time: 1.5, label: 'Diamond (advanced)',           outputs: [{ item: 'diamond',           qty: 2 }], inputs: [{ item: 'kimberlite',            qty: 1 }] },
@@ -263,7 +263,8 @@ export const Modifiers: ModifierOption[] = [
     { id: `${t.id}-speed`, label: `${t.label} Speed`, detail: `×${1 + t.speedup}`,
       spriteId: t.spriteId, speedMult: 1 + t.speedup, productivityMult: 1 },
     { id: `${t.id}-extra`, label: `${t.label} Extra`, detail: `+${t.extraProducts * 100}%`,
-      spriteId: t.spriteId, speedMult: 1, productivityMult: 1 + t.extraProducts },
+      spriteId: t.spriteId, speedMult: 1, productivityMult: 1 + t.extraProducts,
+      speedVariantId: `${t.id}-speed` },
   ]),
 ];
 

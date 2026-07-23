@@ -115,17 +115,28 @@ export function TierPicker({ tiers, selectedId, onSelect, isOverridden, speedUni
 // Renders options from gameData.modifierOptions — works for any game that has
 // production modifiers (DSP proliferators, Factorio modules/beacons, etc.).
 
-export function ModifierPicker({ modifierId, onSelect }: {
+export function ModifierPicker({ modifierId, onSelect, options }: {
   modifierId: string;
   onSelect: (id: string) => void;
+  options?: import('./gameTypes').ModifierOption[]; // restricted recipes pass a filtered list
 }) {
   const { modifierOptions } = useGameData();
+  const opts = options ?? modifierOptions;
   const { open, close, toggle, panelPos, triggerRef, panelRef } = useDropdown();
-  const selected = modifierOptions.find(o => o.id === modifierId) ?? modifierOptions[0];
+
+  // When a restricted recipe has an extra-products modifier selected, resolve to its speed twin.
+  const effectiveId = opts.find(o => o.id === modifierId)
+    ? modifierId
+    : (modifierOptions.find(o => o.id === modifierId)?.speedVariantId ?? modifierId);
+  useEffect(() => {
+    if (effectiveId !== modifierId) onSelect(effectiveId);
+  }, [effectiveId, modifierId, onSelect]);
+
+  const selected = opts.find(o => o.id === effectiveId) ?? opts[0];
 
   const panel = open ? ReactDOM.createPortal(
     <div ref={panelRef} className="recipe-panel" style={{ top: panelPos.top, left: panelPos.left }}>
-      {modifierOptions.map(opt => (
+      {opts.map(opt => (
         <button key={opt.id}
           className={`recipe-option tier-option${opt.id === selected?.id ? ' is-selected' : ''}`}
           onClick={() => { onSelect(opt.id); close(); }}>
@@ -145,7 +156,7 @@ export function ModifierPicker({ modifierId, onSelect }: {
   return (
     <>
       <button ref={triggerRef} className="recipe-trigger tier-trigger"
-        onClick={() => toggle(modifierOptions.length * 44)}>
+        onClick={() => toggle(opts.length * 44)}>
         {selected?.spriteId
           ? <SpriteIcon spriteId={selected.spriteId} fallback="⚗" size={20} />
           : <span style={{ width: 20, display: 'inline-block' }} />}

@@ -106,9 +106,10 @@ export function buildTree(
   // Modifier multipliers:
   // • speedMult        → machine runs faster (more output/time per machine)
   // • productivityMult → each craft yields more output (fewer crafts needed per unit)
+  // Some recipes (e.g. DSP x-ray cracking, collider) forbid extra-products proliferators.
   const mod = cfg.modifierOptions.find(m => m.id === modifierId) ?? cfg.modifierOptions[0];
   const speedMult        = mod?.speedMult        ?? 1;
-  const productivityMult = mod?.productivityMult ?? 1;
+  const productivityMult = (recipe.noExtraProducts ? 1 : mod?.productivityMult) ?? 1;
 
   const perMachine   = (netQty * productivityMult * tier.speed * speedMult / recipe.time) * 60;
   const machines     = rate / perMachine;
@@ -120,9 +121,11 @@ export function buildTree(
   const children = effectiveInputs.map(inp =>
     buildTree(inp.item, craftsPerMin * inp.qty, cfg, nextAncestors, path));
 
+  // All outputs (including byproducts) scale with productivityMult — the extra-products
+  // bonus applies to every output of the recipe, not just the primary one.
   const byproducts = recipe.outputs
     .filter(o => o.item !== itemId)
-    .map(o => ({ itemId: o.item, rate: craftsPerMin * o.qty }));
+    .map(o => ({ itemId: o.item, rate: craftsPerMin * o.qty * productivityMult }));
 
   return {
     itemId, rate, recipe, machine: recipe.machine, tierId: tier.id,

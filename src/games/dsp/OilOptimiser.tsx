@@ -122,22 +122,29 @@ export function OilOptimiser({ refinerySpeed, defaultSmelterTierId, defaultModif
   const smelterTier = smelterTiers.find(t => t.id === smelterTierId) ?? smelterTiers[0];
 
   const modifier = modifierOptions.find(m => m.id === modifierId) ?? modifierOptions[0];
-  // speedMult → machine runs faster (fewer machines for same output, inputs unchanged)
-  // productivityMult → more output per craft (fewer crafts needed, raw inputs also reduced)
-  const totalMult      = (modifier?.speedMult ?? 1) * (modifier?.productivityMult ?? 1);
-  const isProductivity = (modifier?.productivityMult ?? 1) > 1;
+  const speedMult        = modifier?.speedMult        ?? 1;
+  const productivityMult = modifier?.productivityMult ?? 1;
+  // Plasma refining and arc smelters accept both speed and extra-products proliferators.
+  // X-ray cracking and reformed refinement are speed-only — productivityMult is ignored for them.
+  const fullMult       = speedMult * productivityMult; // plasma + arc
+  const restrictedMult = speedMult;                    // x-ray + reformed
 
   const sol = (h + r + g > 0) ? solveOilChain(h, r, g, mode) : null;
-  const craftsPerRef     = refinerySpeed * 15 * totalMult;
-  const craftsPerSmelter = smelterTier.speed * 30 * totalMult;
-  const refs = (crafts: number) => ({
-    exact: crafts / craftsPerRef,
-    ceil: Math.ceil(crafts / craftsPerRef - 1e-9),
-  });
-  const smelterRefs = (crafts: number) => ({
-    exact: crafts / craftsPerSmelter,
-    ceil: Math.ceil(crafts / craftsPerSmelter - 1e-9),
-  });
+  const refs = (crafts: number, restricted = false) => {
+    const cpm = refinerySpeed * 15 * (restricted ? restrictedMult : fullMult);
+    return { exact: crafts / cpm, ceil: Math.ceil(crafts / cpm - 1e-9) };
+  };
+  const smelterRefs = (crafts: number) => {
+    const cpm = smelterTier.speed * 30 * fullMult;
+    return { exact: crafts / cpm, ceil: Math.ceil(crafts / cpm - 1e-9) };
+  };
+
+  // Raw material rates account for which processes can/can't use extra products:
+  // crude (plasma) and arc coal are reduced by productivityMult; reformed coal is not.
+  const crudeDisplay      = sol ? sol.crudeInput / productivityMult : 0;
+  const coalArcDisplay    = sol ? 2 * sol.a / productivityMult : 0;
+  const coalReformedDisplay = sol ? sol.f : 0;
+  const coalDisplay       = coalArcDisplay + coalReformedDisplay;
 
   const demands = [
     { id: 'hydrogen',           label: 'Hydrogen',           val: hStr, set: setHStr },
@@ -206,13 +213,13 @@ export function OilOptimiser({ refinerySpeed, defaultSmelterTierId, defaultModif
           <div className="oil-block">
             <div className="oil-block-title">Raw Inputs</div>
             <div className="oil-chip-row">
-              {sol.crudeInput > 0 && (
-                <OilChip itemId="crude-oil" rate={isProductivity ? sol.crudeInput / (modifier?.productivityMult ?? 1) : sol.crudeInput} />
+              {crudeDisplay > 0 && (
+                <OilChip itemId="crude-oil" rate={crudeDisplay} />
               )}
-              {sol.coalInput > 0 && (
-                <OilChip itemId="coal" rate={isProductivity ? sol.coalInput / (modifier?.productivityMult ?? 1) : sol.coalInput}
+              {coalDisplay > 0 && (
+                <OilChip itemId="coal" rate={coalDisplay}
                   detail={sol.f > 0 && sol.a > 0
-                    ? `${fmt(sol.f)} reformed + ${fmt(2 * sol.a)} arc`
+                    ? `${fmt(coalReformedDisplay)} reformed + ${fmt(coalArcDisplay)} arc`
                     : undefined} />
               )}
             </div>
@@ -232,11 +239,11 @@ export function OilOptimiser({ refinerySpeed, defaultSmelterTierId, defaultModif
                     <span className="oil-process-exact"> ({fmt(refs(sol.p).exact)})</span>
                   </div>
                   <div className="oil-process-io">
-                    <OilIoLine itemId="crude-oil"   rate={sol.crudeInput} sign="−" />
+                    <OilIoLine itemId="crude-oil"   rate={crudeDisplay} sign="−" />
                   </div>
                   <div className="oil-process-io">
-                    <OilIoLine itemId="hydrogen"    rate={sol.p}       sign="+" />
-                    <OilIoLine itemId="refined-oil" rate={2 * sol.p}   sign="+" />
+                    <OilIoLine itemId="hydrogen"    rate={sol.p / productivityMult}       sign="+" />
+                    <OilIoLine itemId="refined-oil" rate={2 * sol.p / productivityMult}   sign="+" />
                   </div>
                 </div>
               )}
@@ -247,8 +254,8 @@ export function OilOptimiser({ refinerySpeed, defaultSmelterTierId, defaultModif
                     X-Ray Cracking
                   </div>
                   <div className="oil-process-count">
-                    {refs(sol.x).ceil}×
-                    <span className="oil-process-exact"> ({fmt(refs(sol.x).exact)})</span>
+                    {refs(sol.x, true).ceil}×
+                    <span className="oil-process-exact"> ({fmt(refs(sol.x, true).exact)})</span>
                   </div>
                   <div className="oil-process-io">
                     <OilIoLine itemId="refined-oil" rate={sol.x}       sign="−" />
@@ -267,8 +274,8 @@ export function OilOptimiser({ refinerySpeed, defaultSmelterTierId, defaultModif
                     Reformed Ref.
                   </div>
                   <div className="oil-process-count">
-                    {refs(sol.f).ceil}×
-                    <span className="oil-process-exact"> ({fmt(refs(sol.f).exact)})</span>
+                    {refs(sol.f, true).ceil}×
+                    <span className="oil-process-exact"> ({fmt(refs(sol.f, true).exact)})</span>
                   </div>
                   <div className="oil-process-io">
                     <OilIoLine itemId="refined-oil" rate={2 * sol.f} sign="−" />
@@ -297,10 +304,10 @@ export function OilOptimiser({ refinerySpeed, defaultSmelterTierId, defaultModif
                     <span className="oil-process-exact"> ({fmt(smelterRefs(sol.a).exact)})</span>
                   </div>
                   <div className="oil-process-io">
-                    <OilIoLine itemId="coal"               rate={2 * sol.a} sign="−" />
+                    <OilIoLine itemId="coal"               rate={coalArcDisplay} sign="−" />
                   </div>
                   <div className="oil-process-io">
-                    <OilIoLine itemId="energetic-graphite" rate={sol.a}     sign="+" />
+                    <OilIoLine itemId="energetic-graphite" rate={sol.a}          sign="+" />
                   </div>
                 </div>
               </div>

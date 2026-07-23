@@ -14,11 +14,12 @@ export interface RecipeIO { item: string; qty: number; }
 
 export interface ProdRecipe {
   id: string;
-  label?: string;    // short display name shown in alternate-recipe picker
+  label?: string;           // short display name shown in alternate-recipe picker
   outputs: RecipeIO[];
   inputs: RecipeIO[];
-  time: number;      // seconds at 1× machine speed
-  machine: string;   // category id (e.g. 'smelter', 'assembler')
+  time: number;             // seconds at 1× machine speed
+  machine: string;          // category id (e.g. 'smelter', 'assembler')
+  noExtraProducts?: boolean; // true when the game forbids extra-products proliferators on this recipe
 }
 
 export interface MachineTier {
@@ -47,10 +48,11 @@ export interface MachineDef {
 export interface ModifierOption {
   id: string;
   label: string;
-  detail?: string;        // short multiplier string shown in picker (e.g. "×1.25", "+12.5%")
+  detail?: string;          // short multiplier string shown in picker (e.g. "×1.25", "+12.5%")
   spriteId?: number;
-  speedMult: number;      // multiplier on machine craft-speed (1 = no effect)
+  speedMult: number;        // multiplier on machine craft-speed (1 = no effect)
   productivityMult: number; // multiplier on output quantity per craft (1 = no effect)
+  speedVariantId?: string;  // for extra-products options: ID of the speed-only equivalent at the same tier
 }
 
 // The assembled data bundle consumed by ProductionCalculator.

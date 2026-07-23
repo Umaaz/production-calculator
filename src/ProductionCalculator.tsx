@@ -195,6 +195,11 @@ function TreeRow({ node, depth, expanded, toggle }: {
   const isModifierOverridden = node.path in itemModifierIds;
   const currentModifierId    = itemModifierIds[node.path] ?? node.modifierId;
 
+  // Recipes tagged noExtraProducts (e.g. DSP x-ray cracking, collider) only allow speed mode.
+  const allowedModifiers = node.recipe?.noExtraProducts
+    ? modifierOptions.filter(m => m.productivityMult <= 1)
+    : modifierOptions;
+
   const realRecipes = recipesByOutput[node.itemId] ?? [];
   const pickerRecipes: ProdRecipe[] | null = item?.canBeRaw
     ? [...realRecipes, MINE_PSEUDO_RECIPE(node.itemId)]
@@ -271,7 +276,7 @@ function TreeRow({ node, depth, expanded, toggle }: {
         <span className="tree-cell tree-cell-prolif">
           {node.recipe && modifierOptions.length > 1 && (
             <>
-              <ModifierPicker modifierId={currentModifierId} onSelect={id => setModifier(node.path, id)} />
+              <ModifierPicker modifierId={currentModifierId} onSelect={id => setModifier(node.path, id)} options={allowedModifiers} />
               {isModifierOverridden && (
                 <button className="tree-reset-btn" onClick={() => clearModifier(node.path)} title="Reset to default modifier">↺</button>
               )}
