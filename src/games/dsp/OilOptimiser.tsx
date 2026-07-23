@@ -352,13 +352,15 @@ export function OilOptimiser({
 // its dropdown state across parent re-renders.
 
 export function OilChainTreeEntry({
-  solution, refinerySpeed, smelterTierId,
+  solution, refinerySpeed, smelterTierId, beltCapacity, demands,
   defaultModifierId, onDefaultModifierChange,
   modifiers, overrides, onModifierChange, onModifierClear,
 }: {
   solution: OilSolution;
   refinerySpeed: number;
   smelterTierId: string;
+  beltCapacity: number;
+  demands: { h: number; r: number; g: number };
   defaultModifierId: string;
   onDefaultModifierChange: (id: string) => void;
   modifiers: OilModifiers;
@@ -395,6 +397,41 @@ export function OilChainTreeEntry({
   const arcPowerKW      = solution.a > 0 ? refsArc(solution.a).exact      * smelterPowerKW  * mults.arc.power      : 0;
   const totalOilPowerKW = plasmaPowerKW + xrayPowerKW + reformedPowerKW + arcPowerKW;
 
+  const beltCell = (rate: number) => {
+    if (rate <= 0 || beltCapacity <= 0) return <span className="tree-cell tree-cell-belts" />;
+    const exact = rate / beltCapacity;
+    const count = Math.ceil(exact - 1e-9);
+    return (
+      <span className="tree-cell tree-cell-belts">
+        <span className="tree-belt-count">{count}×<span className="tree-machine-exact"> ({fmt(exact)})</span></span>
+      </span>
+    );
+  };
+
+  const ioRow = (id: string, rate: number, sign: '+' | '−', ctx: string) => {
+    if (rate <= 0) return null;
+    const item = itemById[id];
+    return (
+      <div key={`${ctx}${sign}${id}`} className="tree-row tree-row-io">
+        <span className="tree-cell tree-cell-item" style={{ paddingLeft: 8 + 44 }}>
+          <span className={`tree-io-sign${sign === '+' ? ' tree-io-sign-out' : ' tree-io-sign-in'}`}>{sign}</span>
+          <SpriteIcon spriteId={item?.spriteId} fallback={item?.icon ?? '❓'} size={16} className="tree-icon" />
+          <span className="tree-name">{item?.name ?? id}</span>
+        </span>
+        <span className={`tree-cell tree-cell-rate${sign === '+' ? ' tree-io-rate-out' : ' tree-io-rate-in'}`}>
+          {fmt(rate)}/min
+        </span>
+        <span className="tree-cell tree-cell-recipe" />
+        <span className="tree-cell tree-cell-machine" />
+        <span className="tree-cell tree-cell-prolif" />
+        <span className="tree-cell tree-cell-count" />
+        <span className="tree-cell tree-cell-power" />
+        {beltCell(rate)}
+        <span className="tree-cell tree-cell-byproducts" />
+      </div>
+    );
+  };
+
   const rawRow = (id: string, rate: number) => {
     if (rate <= 0) return null;
     const item = itemById[id];
@@ -411,7 +448,35 @@ export function OilChainTreeEntry({
         <span className="tree-cell tree-cell-prolif" />
         <span className="tree-cell tree-cell-count" />
         <span className="tree-cell tree-cell-power" />
-        <span className="tree-cell tree-cell-belts" />
+        {beltCell(rate)}
+        <span className="tree-cell tree-cell-byproducts" />
+      </div>
+    );
+  };
+
+  const outputRow = (id: string, rate: number, excess = false) => {
+    if (rate <= 0) return null;
+    const item = itemById[id];
+    return (
+      <div key={`${excess ? 'xs' : 'out'}-${id}`} className="tree-row">
+        <span className="tree-cell tree-cell-item" style={{ paddingLeft: 8 + 22 }}>
+          <span className={`tree-caret leaf${excess ? ' tree-io-sign-excess' : ' tree-io-sign-out'}`}>
+            {excess ? '~' : '+'}
+          </span>
+          <SpriteIcon spriteId={item?.spriteId} fallback={item?.icon ?? '❓'} size={22} className="tree-icon" />
+          <span className="tree-name">{item?.name ?? id}</span>
+        </span>
+        <span className={`tree-cell tree-cell-rate${excess ? ' tree-io-rate-excess' : ' tree-io-rate-out'}`}>
+          {fmt(rate)}/min
+        </span>
+        <span className="tree-cell tree-cell-recipe" />
+        <span className="tree-cell tree-cell-machine">
+          {excess && <span className="tree-tag oil-excess">excess</span>}
+        </span>
+        <span className="tree-cell tree-cell-prolif" />
+        <span className="tree-cell tree-cell-count" />
+        <span className="tree-cell tree-cell-power" />
+        {beltCell(rate)}
         <span className="tree-cell tree-cell-byproducts" />
       </div>
     );
@@ -452,87 +517,112 @@ export function OilChainTreeEntry({
         <span className="tree-cell tree-cell-byproducts" />
       </div>
       {expanded && <>
-        {rawRow('crude-oil', crudeDisplay)}
-        {rawRow('coal', coalDisplay)}
+        {/* Net outputs — demanded first, then any excess */}
+        {outputRow('refined-oil', demands.r)}
+        {outputRow('energetic-graphite', demands.g)}
+        {outputRow('hydrogen', demands.h)}
+        {outputRow('hydrogen', solution.excessH, true)}
+        {outputRow('refined-oil', solution.excessRefined, true)}
 
         {solution.p > 0 && (
-          <div className="tree-row">
-            <span className="tree-cell tree-cell-item" style={{ paddingLeft: 8 + 22 }}>
-              <span className="tree-caret leaf">•</span>
-              <SpriteIcon spriteId={refSprite} fallback="🏭" size={22} className="tree-icon" />
-              <span className="tree-name">Plasma Refining</span>
-            </span>
-            <span className="tree-cell tree-cell-rate" />
-            <span className="tree-cell tree-cell-recipe" />
-            <span className="tree-cell tree-cell-machine"><span className="tree-machine-name">{refLabel}</span></span>
-            {modCell('plasma')}
-            <span className="tree-cell tree-cell-count">
-              <span className="tree-machine-count">{refsPlasma(solution.p).ceil}×<span className="tree-machine-exact"> ({fmt(refsPlasma(solution.p).exact)})</span></span>
-            </span>
-            <span className="tree-cell tree-cell-power">{plasmaPowerKW > 0 && fmtPower(plasmaPowerKW)}</span>
-            <span className="tree-cell tree-cell-belts" />
-            <span className="tree-cell tree-cell-byproducts" />
-          </div>
+          <>
+            <div className="tree-row">
+              <span className="tree-cell tree-cell-item" style={{ paddingLeft: 8 + 22 }}>
+                <span className="tree-caret leaf">•</span>
+                <SpriteIcon spriteId={refSprite} fallback="🏭" size={22} className="tree-icon" />
+                <span className="tree-name">Plasma Refining</span>
+              </span>
+              <span className="tree-cell tree-cell-rate" />
+              <span className="tree-cell tree-cell-recipe" />
+              <span className="tree-cell tree-cell-machine"><span className="tree-machine-name">{refLabel}</span></span>
+              {modCell('plasma')}
+              <span className="tree-cell tree-cell-count">
+                <span className="tree-machine-count">{refsPlasma(solution.p).ceil}×<span className="tree-machine-exact"> ({fmt(refsPlasma(solution.p).exact)})</span></span>
+              </span>
+              <span className="tree-cell tree-cell-power">{plasmaPowerKW > 0 && fmtPower(plasmaPowerKW)}</span>
+              <span className="tree-cell tree-cell-belts" />
+              <span className="tree-cell tree-cell-byproducts" />
+            </div>
+            {ioRow('crude-oil', crudeDisplay, '−', 'p')}
+            {ioRow('hydrogen', solution.p / mults.plasma.prod, '+', 'p')}
+            {ioRow('refined-oil', 2 * solution.p / mults.plasma.prod, '+', 'p')}
+          </>
         )}
 
         {solution.x > 0 && (
-          <div className="tree-row">
-            <span className="tree-cell tree-cell-item" style={{ paddingLeft: 8 + 22 }}>
-              <span className="tree-caret leaf">•</span>
-              <SpriteIcon spriteId={refSprite} fallback="🏭" size={22} className="tree-icon" />
-              <span className="tree-name">X-Ray Cracking</span>
-            </span>
-            <span className="tree-cell tree-cell-rate" />
-            <span className="tree-cell tree-cell-recipe" />
-            <span className="tree-cell tree-cell-machine"><span className="tree-machine-name">{refLabel}</span></span>
-            {modCell('xray', speedOnly)}
-            <span className="tree-cell tree-cell-count">
-              <span className="tree-machine-count">{refsXray(solution.x).ceil}×<span className="tree-machine-exact"> ({fmt(refsXray(solution.x).exact)})</span></span>
-            </span>
-            <span className="tree-cell tree-cell-power">{xrayPowerKW > 0 && fmtPower(xrayPowerKW)}</span>
-            <span className="tree-cell tree-cell-belts" />
-            <span className="tree-cell tree-cell-byproducts" />
-          </div>
+          <>
+            <div className="tree-row">
+              <span className="tree-cell tree-cell-item" style={{ paddingLeft: 8 + 22 }}>
+                <span className="tree-caret leaf">•</span>
+                <SpriteIcon spriteId={refSprite} fallback="🏭" size={22} className="tree-icon" />
+                <span className="tree-name">X-Ray Cracking</span>
+              </span>
+              <span className="tree-cell tree-cell-rate" />
+              <span className="tree-cell tree-cell-recipe" />
+              <span className="tree-cell tree-cell-machine"><span className="tree-machine-name">{refLabel}</span></span>
+              {modCell('xray', speedOnly)}
+              <span className="tree-cell tree-cell-count">
+                <span className="tree-machine-count">{refsXray(solution.x).ceil}×<span className="tree-machine-exact"> ({fmt(refsXray(solution.x).exact)})</span></span>
+              </span>
+              <span className="tree-cell tree-cell-power">{xrayPowerKW > 0 && fmtPower(xrayPowerKW)}</span>
+              <span className="tree-cell tree-cell-belts" />
+              <span className="tree-cell tree-cell-byproducts" />
+            </div>
+            {ioRow('refined-oil', solution.x, '−', 'x')}
+            {ioRow('hydrogen', 2 * solution.x, '−', 'x')}
+            {ioRow('energetic-graphite', solution.x, '+', 'x')}
+            {ioRow('hydrogen', 3 * solution.x, '+', 'x')}
+          </>
         )}
 
         {solution.f > 0 && (
-          <div className="tree-row">
-            <span className="tree-cell tree-cell-item" style={{ paddingLeft: 8 + 22 }}>
-              <span className="tree-caret leaf">•</span>
-              <SpriteIcon spriteId={refSprite} fallback="🏭" size={22} className="tree-icon" />
-              <span className="tree-name">Reformed Ref.</span>
-            </span>
-            <span className="tree-cell tree-cell-rate" />
-            <span className="tree-cell tree-cell-recipe" />
-            <span className="tree-cell tree-cell-machine"><span className="tree-machine-name">{refLabel}</span></span>
-            {modCell('reformed', speedOnly)}
-            <span className="tree-cell tree-cell-count">
-              <span className="tree-machine-count">{refsReformed(solution.f).ceil}×<span className="tree-machine-exact"> ({fmt(refsReformed(solution.f).exact)})</span></span>
-            </span>
-            <span className="tree-cell tree-cell-power">{reformedPowerKW > 0 && fmtPower(reformedPowerKW)}</span>
-            <span className="tree-cell tree-cell-belts" />
-            <span className="tree-cell tree-cell-byproducts" />
-          </div>
+          <>
+            <div className="tree-row">
+              <span className="tree-cell tree-cell-item" style={{ paddingLeft: 8 + 22 }}>
+                <span className="tree-caret leaf">•</span>
+                <SpriteIcon spriteId={refSprite} fallback="🏭" size={22} className="tree-icon" />
+                <span className="tree-name">Reformed Ref.</span>
+              </span>
+              <span className="tree-cell tree-cell-rate" />
+              <span className="tree-cell tree-cell-recipe" />
+              <span className="tree-cell tree-cell-machine"><span className="tree-machine-name">{refLabel}</span></span>
+              {modCell('reformed', speedOnly)}
+              <span className="tree-cell tree-cell-count">
+                <span className="tree-machine-count">{refsReformed(solution.f).ceil}×<span className="tree-machine-exact"> ({fmt(refsReformed(solution.f).exact)})</span></span>
+              </span>
+              <span className="tree-cell tree-cell-power">{reformedPowerKW > 0 && fmtPower(reformedPowerKW)}</span>
+              <span className="tree-cell tree-cell-belts" />
+              <span className="tree-cell tree-cell-byproducts" />
+            </div>
+            {ioRow('refined-oil', 2 * solution.f, '−', 'f')}
+            {ioRow('hydrogen', solution.f, '−', 'f')}
+            {ioRow('coal', solution.f, '−', 'f')}
+            {ioRow('refined-oil', 3 * solution.f, '+', 'f')}
+          </>
         )}
 
         {solution.a > 0 && (
-          <div className="tree-row">
-            <span className="tree-cell tree-cell-item" style={{ paddingLeft: 8 + 22 }}>
-              <span className="tree-caret leaf">•</span>
-              <SpriteIcon spriteId={smelterTier?.spriteId} fallback="🔥" size={22} className="tree-icon" />
-              <span className="tree-name">Arc Smelting (Graphite)</span>
-            </span>
-            <span className="tree-cell tree-cell-rate" />
-            <span className="tree-cell tree-cell-recipe" />
-            <span className="tree-cell tree-cell-machine"><span className="tree-machine-name">{smelterTier?.label ?? 'Arc Smelter'}</span></span>
-            {modCell('arc')}
-            <span className="tree-cell tree-cell-count">
-              <span className="tree-machine-count">{refsArc(solution.a).ceil}×<span className="tree-machine-exact"> ({fmt(refsArc(solution.a).exact)})</span></span>
-            </span>
-            <span className="tree-cell tree-cell-power">{arcPowerKW > 0 && fmtPower(arcPowerKW)}</span>
-            <span className="tree-cell tree-cell-belts" />
-            <span className="tree-cell tree-cell-byproducts" />
-          </div>
+          <>
+            <div className="tree-row">
+              <span className="tree-cell tree-cell-item" style={{ paddingLeft: 8 + 22 }}>
+                <span className="tree-caret leaf">•</span>
+                <SpriteIcon spriteId={smelterTier?.spriteId} fallback="🔥" size={22} className="tree-icon" />
+                <span className="tree-name">Arc Smelting (Graphite)</span>
+              </span>
+              <span className="tree-cell tree-cell-rate" />
+              <span className="tree-cell tree-cell-recipe" />
+              <span className="tree-cell tree-cell-machine"><span className="tree-machine-name">{smelterTier?.label ?? 'Arc Smelter'}</span></span>
+              {modCell('arc')}
+              <span className="tree-cell tree-cell-count">
+                <span className="tree-machine-count">{refsArc(solution.a).ceil}×<span className="tree-machine-exact"> ({fmt(refsArc(solution.a).exact)})</span></span>
+              </span>
+              <span className="tree-cell tree-cell-power">{arcPowerKW > 0 && fmtPower(arcPowerKW)}</span>
+              <span className="tree-cell tree-cell-belts" />
+              <span className="tree-cell tree-cell-byproducts" />
+            </div>
+            {ioRow('coal', coalArcDisplay, '−', 'a')}
+            {ioRow('energetic-graphite', solution.a / mults.arc.prod, '+', 'a')}
+          </>
         )}
       </>}
     </>

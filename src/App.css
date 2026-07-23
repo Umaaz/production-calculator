@@ -867,6 +867,18 @@ body, html, #root {
 .tree-icon { flex-shrink: 0; font-size: 15px; width: 20px; text-align: center; }
 .tree-name { color: #d0d0f0; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+.tree-row-io { font-size: 11px; }
+.tree-row-io:hover { background: rgba(255,255,255,0.02); }
+.tree-row-io .tree-name { color: #9090b8; font-weight: 400; }
+.tree-io-sign { width: 18px; flex-shrink: 0; font-weight: 700; font-size: 12px; text-align: center; }
+.tree-io-sign-out    { color: #7fd18f; }
+.tree-io-sign-in     { color: #e08060; }
+.tree-io-sign-excess { color: #c8a020; }
+.tree-io-rate-out    { color: #7fd18f; }
+.tree-io-rate-in     { color: #e08060; }
+.tree-io-rate-excess { color: #c8a020; }
+.tree-tag.oil-excess { color: #c8a020; background: rgba(150,120,20,0.18); }
+
 
 .tree-tag {
   font-size: 11px;

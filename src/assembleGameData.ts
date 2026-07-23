@@ -39,6 +39,8 @@ export function assembleGameData(mod: GameModule): GameData {
     beltTiers: mod.Belts,
     sorterTiers: mod.Sorters ?? [],
     modifierOptions: mod.Modifiers,
+    powerPlants: mod.PowerPlants ?? [],
+    powerFuels: mod.PowerFuels ?? [],
     features: mod.features ?? {},
   };
 }
