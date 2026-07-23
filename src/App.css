@@ -918,9 +918,33 @@ body, html, #root {
 }
 .summary-exact { color: #55558a; font-weight: 400; }
 .summary-recipe-tag { color: #55558a; font-size: 10px; font-weight: 400; }
-.summary-machine-tag {
-  display: inline-flex; align-items: center; gap: 3px;
-  color: #55558a; font-size: 10px; font-weight: 400; margin-left: 4px;
+.summary-row-recipe { align-items: stretch; padding: 5px 0; }
+.summary-icon-recipe { align-self: center; flex-shrink: 0; }
+.summary-row-lines {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.summary-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.summary-line-machine { opacity: 0.75; }
+.summary-name-machine {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: #8888aa;
+}
+.summary-val-machine {
+  font-size: 11px;
+  color: #9999cc;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── Recipe picker ─────────────────────────────────────────────────────────── */

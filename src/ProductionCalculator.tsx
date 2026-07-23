@@ -629,29 +629,39 @@ export function ProductionCalculator({ gameId, gameData, gameLabel, gameIcon, on
               <div className="summary-block">
                 <div className="summary-title">Recipe Totals / min</div>
                 {Object.values(totals.crafted).sort((a, b) => b.rate - a.rate)
-                  .map(({ itemId, recipe, rate, machine, tierId }) => {
+                  .map(({ itemId, recipe, rate, machines: machineCount, machine, tierId }) => {
                     const item = itemById[itemId];
                     const hasAlt = (recipesByOutput[itemId]?.length ?? 0) > 1 || item?.canBeRaw;
                     const found = tierId ? findTier(tierId, machineTiers) : null;
                     const machineSprite = found?.tier.spriteId ?? (machine ? machineTiers[machine]?.[0]?.spriteId : undefined);
                     const machineName = found?.tier.label ?? (machine ? machines[machine]?.name : null);
                     return (
-                      <div key={`${itemId}::${recipe.id}`} className="summary-row">
-                        <SpriteIcon spriteId={item?.spriteId} fallback={item?.icon ?? '❓'} size={20} />
-                        <span className="summary-name">
-                          {item?.name ?? itemId}
-                          {hasAlt && <span className="summary-recipe-tag"> {recipe.label ?? 'Standard'}</span>}
-                          {machineName && (
-                            <span className="summary-machine-tag">
-                              <SpriteIcon spriteId={machineSprite} fallback={machine ? machines[machine]?.icon : '🏭'} size={12} />
-                              {machineName}
+                      <div key={`${itemId}::${recipe.id}`} className="summary-row summary-row-recipe">
+                        <SpriteIcon spriteId={item?.spriteId} fallback={item?.icon ?? '❓'} size={30} className="summary-icon-recipe" />
+                        <div className="summary-row-lines">
+                          <div className="summary-line">
+                            <span className="summary-name">
+                              {item?.name ?? itemId}
+                              {hasAlt && <span className="summary-recipe-tag"> {recipe.label ?? 'Standard'}</span>}
                             </span>
+                            <span className="summary-val">
+                              {fmt(rate)}/m
+                              <span className="summary-exact"> ({fmt(rate / beltCapacity)} belts)</span>
+                            </span>
+                          </div>
+                          {machineName && (
+                            <div className="summary-line summary-line-machine">
+                              <span className="summary-name summary-name-machine">
+                                <SpriteIcon spriteId={machineSprite} fallback={machine ? machines[machine]?.icon : '🏭'} size={14} />
+                                {machineName}
+                              </span>
+                              <span className="summary-val summary-val-machine">
+                                {Math.ceil(machineCount - 1e-9)}×
+                                <span className="summary-exact"> ({fmt(machineCount)})</span>
+                              </span>
+                            </div>
                           )}
-                        </span>
-                        <span className="summary-val">
-                          {fmt(rate)}/m
-                          <span className="summary-exact"> ({fmt(rate / beltCapacity)} belts)</span>
-                        </span>
+                        </div>
                       </div>
                     );
                   })}
