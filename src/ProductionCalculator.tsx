@@ -4,13 +4,13 @@ import ReactDOM from 'react-dom';
 import type { ProdRecipe, ProdItem, GameData } from './gameTypes';
 import {
   GameDataCtx, useGameData, useDropdown,
-  SpriteIcon, TierPicker, ModifierPicker,
+  SpriteIcon, TierPicker, ModifierPicker, PowerPlantPicker, PowerFuelPicker,
 } from './calcShared';
 import {
-  collectPaths, findTier, buildTree, aggregate, fmt,
+  collectPaths, findTier, buildTree, aggregate, fmt, fmtPower,
   type TreeNode, type TreeBuildConfig, type Totals,
 } from './treeLogic';
-import { OilOptimiser, OilChainTreeEntry, solveOilChain } from './games/dsp/OilOptimiser';
+import { OilOptimiser, OilChainTreeEntry, solveOilChain, buildMults } from './games/dsp/OilOptimiser';
 import type { OilMode, OilModifiers } from './games/dsp/OilOptimiser';
 
 // ── Path-keyed state map ──────────────────────────────────────────────────────
@@ -300,7 +300,12 @@ function TreeRow({ node, depth, expanded, toggle }: {
           )}
         </span>
 
-        {/* Col 7: belt count */}
+        {/* Col 7: power */}
+        <span className="tree-cell tree-cell-power">
+          {node.powerKW > 0 && fmtPower(node.powerKW)}
+        </span>
+
+        {/* Col 8: belt count */}
         <span className="tree-cell tree-cell-belts">
           {node.rate > 0 && (
             <span className="tree-belt-count">
@@ -335,7 +340,7 @@ const OIL_CHAIN_ITEM_IDS = new Set(['hydrogen', 'refined-oil', 'energetic-graphi
 export function ProductionCalculator({ gameId, gameData, gameLabel, gameIcon, onBack }: {
   gameId: string; gameData: GameData; gameLabel: string; gameIcon: string; onBack: () => void;
 }) {
-  const { itemById, craftableItems, recipesByOutput, recipeByOutput, machineTiers, machines, beltTiers, sorterTiers, modifierOptions, features } = gameData;
+  const { itemById, craftableItems, recipesByOutput, recipeByOutput, machineTiers, machines, beltTiers, sorterTiers, modifierOptions, powerPlants, powerFuels, features } = gameData;
 
   const tierCats = Object.keys(machineTiers).filter(cat => cat !== 'raw' && machineTiers[cat].length > 1);
 
@@ -449,6 +454,39 @@ export function ProductionCalculator({ gameId, gameData, gameLabel, gameIcon, on
     if (h + r + g === 0) return null;
     return solveOilChain(h, r, g, oilMode);
   }, [features.oilOptimiser, oilDemands, oilMode]);
+
+  const oilPowerKW = useMemo(() => {
+    if (!treeOilSolution) return 0;
+    const sol = treeOilSolution;
+    const mults = buildMults(modifierOptions, oilModifiers);
+    const refTier     = machineTiers['refinery']?.find(t => t.id === defaultTierIds['refinery']) ?? machineTiers['refinery']?.[0];
+    const smelterTier = machineTiers['smelter']?.find(t => t.id === oilSmelterTierId) ?? machineTiers['smelter']?.[0];
+    const refPow     = refTier?.workPowerKW     ?? 0;
+    const smelterPow = smelterTier?.workPowerKW ?? 0;
+    const refSpeed   = refTier?.speed ?? 1;
+    const smSpeed    = smelterTier?.speed ?? 1;
+    return (sol.p > 0 ? (sol.p / (refSpeed * 15 * mults.plasma.full))   * refPow     * mults.plasma.power   : 0)
+         + (sol.x > 0 ? (sol.x / (refSpeed * 15 * mults.xray.full))     * refPow     * mults.xray.power     : 0)
+         + (sol.f > 0 ? (sol.f / (refSpeed * 15 * mults.reformed.full)) * refPow     * mults.reformed.power : 0)
+         + (sol.a > 0 ? (sol.a / (smSpeed  * 30 * mults.arc.full))      * smelterPow * mults.arc.power      : 0);
+  }, [treeOilSolution, modifierOptions, oilModifiers, machineTiers, defaultTierIds, oilSmelterTierId]);
+
+  const totalPowerKW = useMemo(() =>
+    (totals ? Object.values(totals.crafted).reduce((s, e) => s + e.powerKW, 0) : 0) + oilPowerKW,
+  [totals, oilPowerKW]);
+
+  const [selectedPowerPlantId, setSelectedPowerPlantId] = usePersisted(K('powerPlantId'), powerPlants[0]?.id ?? '');
+  const [selectedPowerFuelId,  setSelectedPowerFuelId]  = usePersisted(K('powerFuelId'),  powerFuels[0]?.id ?? '');
+  const [powerPlantPcts, setPowerPlantPcts] = usePersisted<Record<string, number>>(K('powerPlantPcts'), {});
+
+  const selectedPlant       = powerPlants.find(p => p.id === selectedPowerPlantId) ?? powerPlants[0];
+  const compatibleFuels     = selectedPlant?.fuelIds ? powerFuels.filter(f => selectedPlant.fuelIds!.includes(f.id)) : [];
+  const selectedFuel        = compatibleFuels.find(f => f.id === selectedPowerFuelId) ?? compatibleFuels[0];
+  const selectedPlantPct    = selectedPlant?.variableOutput ? (powerPlantPcts[selectedPlant.id] ?? 100) : 100;
+  const effectivePlantKW    = selectedPlant ? selectedPlant.outputKW * selectedPlantPct / 100 : 0;
+  const powerPlantsNeeded   = (selectedPlant && totalPowerKW > 0 && effectivePlantKW > 0) ? Math.ceil(totalPowerKW / effectivePlantKW - 1e-9) : 0;
+  const powerFuelPerMin     = (selectedFuel && totalPowerKW > 0) ? (totalPowerKW * 60) / (selectedFuel.energyMJ * 1000) : 0;
+  const setSelectedPlantPct = (pct: number) => setPowerPlantPcts(prev => ({ ...prev, [selectedPlant!.id]: Math.min(200, Math.max(0, pct)) }));
 
   // Expand all nodes whenever tree structure changes (not just tier/modifier tweaks).
   const structuralKey = `${targetId}:${rate}:${JSON.stringify(selectedRecipes)}:${JSON.stringify(defaultRecipeIds)}`;
@@ -572,6 +610,7 @@ export function ProductionCalculator({ gameId, gameData, gameLabel, gameIcon, on
                 <span className="tree-col-header">Machine</span>
                 <span className="tree-col-header">{modifierOptions.length > 1 ? 'Modifier' : ''}</span>
                 <span className="tree-col-header tree-col-header-count">Count</span>
+                <span className="tree-col-header tree-col-header-power">Power</span>
                 <span className="tree-col-header tree-col-header-belts">Belts</span>
                 <span className="tree-col-header">Byproducts</span>
               </div>
@@ -628,44 +667,107 @@ export function ProductionCalculator({ gameId, gameData, gameLabel, gameIcon, on
 
               <div className="summary-block">
                 <div className="summary-title">Recipe Totals / min</div>
-                {Object.values(totals.crafted).sort((a, b) => b.rate - a.rate)
-                  .map(({ itemId, recipe, rate, machines: machineCount, machine, tierId }) => {
-                    const item = itemById[itemId];
-                    const hasAlt = (recipesByOutput[itemId]?.length ?? 0) > 1 || item?.canBeRaw;
-                    const found = tierId ? findTier(tierId, machineTiers) : null;
-                    const machineSprite = found?.tier.spriteId ?? (machine ? machineTiers[machine]?.[0]?.spriteId : undefined);
-                    const machineName = found?.tier.label ?? (machine ? machines[machine]?.name : null);
-                    return (
-                      <div key={`${itemId}::${recipe.id}`} className="summary-row summary-row-recipe">
-                        <SpriteIcon spriteId={item?.spriteId} fallback={item?.icon ?? '❓'} size={30} className="summary-icon-recipe" />
-                        <div className="summary-row-lines">
-                          <div className="summary-line">
-                            <span className="summary-name">
-                              {item?.name ?? itemId}
-                              {hasAlt && <span className="summary-recipe-tag"> {recipe.label ?? 'Standard'}</span>}
-                            </span>
-                            <span className="summary-val">
-                              {fmt(rate)}/m
-                              <span className="summary-exact"> ({fmt(rate / beltCapacity)} belts)</span>
-                            </span>
-                          </div>
-                          {machineName && (
-                            <div className="summary-line summary-line-machine">
-                              <span className="summary-name summary-name-machine">
-                                <SpriteIcon spriteId={machineSprite} fallback={machine ? machines[machine]?.icon : '🏭'} size={14} />
-                                {machineName}
-                              </span>
-                              <span className="summary-val summary-val-machine">
-                                {Math.ceil(machineCount - 1e-9)}×
-                                <span className="summary-exact"> ({fmt(machineCount)})</span>
-                              </span>
-                            </div>
-                          )}
+                {(() => {
+                    const entries = Object.values(totals.crafted).sort((a, b) => b.rate - a.rate);
+                    return (<>
+                      {totalPowerKW > 0 && (
+                        <div className="summary-row summary-power-total">
+                          <span className="summary-name summary-power-label">⚡ Total Power</span>
+                          <span className="summary-val summary-power-val">{fmtPower(totalPowerKW)}</span>
                         </div>
-                      </div>
-                    );
-                  })}
+                      )}
+                      {entries.map(({ itemId, recipe, rate, machines: machineCount, powerKW, machine, tierId }) => {
+                        const item = itemById[itemId];
+                        const hasAlt = (recipesByOutput[itemId]?.length ?? 0) > 1 || item?.canBeRaw;
+                        const found = tierId ? findTier(tierId, machineTiers) : null;
+                        const machineSprite = found?.tier.spriteId ?? (machine ? machineTiers[machine]?.[0]?.spriteId : undefined);
+                        const machineName = found?.tier.label ?? (machine ? machines[machine]?.name : null);
+                        return (
+                          <div key={`${itemId}::${recipe.id}`} className="summary-row summary-row-recipe">
+                            <SpriteIcon spriteId={item?.spriteId} fallback={item?.icon ?? '❓'} size={30} className="summary-icon-recipe" />
+                            <div className="summary-row-lines">
+                              <div className="summary-line">
+                                <span className="summary-name">
+                                  {item?.name ?? itemId}
+                                  {hasAlt && <span className="summary-recipe-tag"> {recipe.label ?? 'Standard'}</span>}
+                                </span>
+                                <span className="summary-val">
+                                  {fmt(rate)}/m
+                                  <span className="summary-exact"> ({fmt(rate / beltCapacity)} belts)</span>
+                                </span>
+                              </div>
+                              {machineName && (
+                                <div className="summary-line summary-line-machine">
+                                  <span className="summary-name summary-name-machine">
+                                    <SpriteIcon spriteId={machineSprite} fallback={machine ? machines[machine]?.icon : '🏭'} size={14} />
+                                    {machineName}
+                                  </span>
+                                  <span className="summary-val summary-val-machine">
+                                    {Math.ceil(machineCount - 1e-9)}×
+                                    <span className="summary-exact"> ({fmt(machineCount)})</span>
+                                    {powerKW > 0 && <span className="summary-power"> · {fmtPower(powerKW)}</span>}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </>);
+                  })()}
               </div>
+
+              {powerPlants.length > 0 && (
+                <div className="summary-block">
+                  <div className="summary-title">Power Supply</div>
+                  <div className="power-pickers">
+                    <PowerPlantPicker
+                      plants={powerPlants}
+                      selectedId={selectedPowerPlantId}
+                      onSelect={setSelectedPowerPlantId}
+                    />
+                    {compatibleFuels.length > 0 && (
+                      <PowerFuelPicker
+                        fuels={compatibleFuels}
+                        selectedId={selectedFuel?.id ?? ''}
+                        onSelect={setSelectedPowerFuelId}
+                      />
+                    )}
+                    {selectedPlant?.variableOutput && (
+                      <label className="power-pct-label">
+                        <input
+                          type="number" min={0} max={200} step={1}
+                          className="power-pct-input"
+                          value={selectedPlantPct}
+                          onChange={e => setSelectedPlantPct(Number(e.target.value))}
+                        />
+                        <span className="power-pct-unit">%</span>
+                      </label>
+                    )}
+                  </div>
+                  {selectedPlant && totalPowerKW > 0 && (
+                    <div className="power-result">
+                      <div className="power-result-row">
+                        <SpriteIcon spriteId={selectedPlant.spriteId} fallback={selectedPlant.icon} size={20} />
+                        <span className="power-result-count">{powerPlantsNeeded}×</span>
+                        <span className="power-result-name">{selectedPlant.name}</span>
+                        <span className="power-result-cap">{fmtPower(effectivePlantKW)} each</span>
+                      </div>
+                      {selectedFuel && powerFuelPerMin > 0 && (
+                        <div className="power-result-row power-result-fuel">
+                          <SpriteIcon spriteId={itemById[selectedFuel.id]?.spriteId ?? selectedFuel.spriteId} fallback={itemById[selectedFuel.id]?.icon ?? selectedFuel.icon} size={20} />
+                          <span className="power-result-count">{fmt(powerFuelPerMin)}/m</span>
+                          <span className="power-result-name">{itemById[selectedFuel.id]?.name ?? selectedFuel.name}</span>
+                          <span className="power-result-cap">{selectedFuel.energyMJ} MJ each</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {selectedPlant && totalPowerKW === 0 && (
+                    <div className="power-result-empty">No power demand calculated yet.</div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         ) : (

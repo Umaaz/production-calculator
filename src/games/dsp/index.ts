@@ -9,7 +9,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import './icons.css';
-import type { GameModule, MachineCategory, MachineTier, ModifierOption, ProdItem, ProdRecipe } from '../../gameTypes';
+import type { GameModule, MachineCategory, MachineTier, ModifierOption, PowerFuel, PowerPlant, ProdItem, ProdRecipe } from '../../gameTypes';
 
 export const iconNamespace = 'item';
 
@@ -182,51 +182,51 @@ export const MachineTiers: MachineCategory[] = [
   {
     id: 'raw', name: 'Extraction', icon: '⛏',
     tiers: [
-      { id: 'mining-mk1', label: 'Mining Machine',       speed: 1.0, spriteId: 2301 },
-      { id: 'mining-mk2', label: 'Large Mining Machine', speed: 1.5, spriteId: 2316 },
+      { id: 'mining-mk1', label: 'Mining Machine',       speed: 1.0, spriteId: 2301, workPowerKW:  270 },
+      { id: 'mining-mk2', label: 'Large Mining Machine', speed: 1.5, spriteId: 2316, workPowerKW: 2160 },
     ],
   },
   {
     id: 'smelter', name: 'Smelter', icon: '🔥',
     tiers: [
-      { id: 'arc',        label: 'Arc Smelter',       speed: 1.0, spriteId: 2302 },
-      { id: 'plane',      label: 'Plane Smelter',      speed: 2.0, spriteId: 2315 },
-      { id: 'negentropy', label: 'Negentropy Smelter', speed: 3.0, spriteId: 2319 },
+      { id: 'arc',        label: 'Arc Smelter',       speed: 1.0, spriteId: 2302, workPowerKW:  360 },
+      { id: 'plane',      label: 'Plane Smelter',      speed: 2.0, spriteId: 2315, workPowerKW: 1080 },
+      { id: 'negentropy', label: 'Negentropy Smelter', speed: 3.0, spriteId: 2319, workPowerKW: 1440 },
     ],
   },
   {
     id: 'assembler', name: 'Assembler', icon: '⚙',
     tiers: [
-      { id: 'mk1', label: 'Assembler Mk.I',   speed: 0.75, spriteId: 2303 },
-      { id: 'mk2', label: 'Assembler Mk.II',  speed: 1.0,  spriteId: 2304 },
-      { id: 'mk3', label: 'Assembler Mk.III', speed: 1.5,  spriteId: 2305 },
-      { id: 'mk4', label: 'Assembler Mk.IV',  speed: 3.0,  spriteId: 2318 },
+      { id: 'mk1', label: 'Assembler Mk.I',   speed: 0.75, spriteId: 2303, workPowerKW:  270 },
+      { id: 'mk2', label: 'Assembler Mk.II',  speed: 1.0,  spriteId: 2304, workPowerKW:  540 },
+      { id: 'mk3', label: 'Assembler Mk.III', speed: 1.5,  spriteId: 2305, workPowerKW: 1080 },
+      { id: 'mk4', label: 'Assembler Mk.IV',  speed: 3.0,  spriteId: 2318, workPowerKW: 1440 },
     ],
   },
   {
     id: 'chemical', name: 'Chemical Plant', icon: '🧪',
     tiers: [
-      { id: 'chem',    label: 'Chemical Plant',         speed: 1.0, spriteId: 2309 },
-      { id: 'quantum', label: 'Quantum Chemical Plant', speed: 2.0, spriteId: 2317 },
+      { id: 'chem',    label: 'Chemical Plant',         speed: 1.0, spriteId: 2309, workPowerKW:  720 },
+      { id: 'quantum', label: 'Quantum Chemical Plant', speed: 2.0, spriteId: 2317, workPowerKW: 1440 },
     ],
   },
   {
     id: 'refinery', name: 'Oil Refinery', icon: '🛢',
     tiers: [
-      { id: 'refinery', label: 'Oil Refinery', speed: 1.0, spriteId: 2308 },
+      { id: 'refinery', label: 'Oil Refinery', speed: 1.0, spriteId: 2308, workPowerKW: 960 },
     ],
   },
   {
     id: 'lab', name: 'Matrix Lab', icon: '🔬',
     tiers: [
-      { id: 'matrix',    label: 'Matrix Lab',        speed: 1.0, spriteId: 2901 },
-      { id: 'evolution', label: 'Self-Evolution Lab', speed: 3.0, spriteId: 2902 },
+      { id: 'matrix',    label: 'Matrix Lab',        speed: 1.0, spriteId: 2901, workPowerKW:  480 },
+      { id: 'evolution', label: 'Self-Evolution Lab', speed: 3.0, spriteId: 2902, workPowerKW: 1440 },
     ],
   },
   {
     id: 'collider', name: 'Particle Collider', icon: '⚛',
     tiers: [
-      { id: 'collider', label: 'Particle Collider', speed: 1.0, spriteId: 2310 },
+      { id: 'collider', label: 'Particle Collider', speed: 1.0, spriteId: 2310, workPowerKW: 12000 },
     ],
   },
 ];
@@ -251,21 +251,51 @@ export const Sorters: MachineTier[] = [
 
 // ── Modifiers (Proliferators) ────────────────────────────────────────────────
 
-const _prolif: { id: string; label: string; extraProducts: number; speedup: number; spriteId?: number }[] = [
-  { id: 'mk1', label: 'Mk.I',   extraProducts: 0.125, speedup: 0.25, spriteId: 1141 },
-  { id: 'mk2', label: 'Mk.II',  extraProducts: 0.20,  speedup: 0.50, spriteId: 1142 },
-  { id: 'mk3', label: 'Mk.III', extraProducts: 0.25,  speedup: 1.00, spriteId: 1143 },
+const _prolif: { id: string; label: string; extraProducts: number; speedup: number; powerSpeedMult: number; powerExtraMult: number; spriteId?: number }[] = [
+  { id: 'mk1', label: 'Mk.I',   extraProducts: 0.125, speedup: 0.25, powerSpeedMult: 1.3, powerExtraMult: 1.7, spriteId: 1141 },
+  { id: 'mk2', label: 'Mk.II',  extraProducts: 0.20,  speedup: 0.50, powerSpeedMult: 1.7, powerExtraMult: 2.4, spriteId: 1142 },
+  { id: 'mk3', label: 'Mk.III', extraProducts: 0.25,  speedup: 1.00, powerSpeedMult: 2.0, powerExtraMult: 2.5, spriteId: 1143 },
 ];
 
 export const Modifiers: ModifierOption[] = [
-  { id: 'none', label: 'None', detail: '—', speedMult: 1, productivityMult: 1 },
+  { id: 'none', label: 'None', detail: '—', speedMult: 1, productivityMult: 1, powerMult: 1 },
   ..._prolif.flatMap(t => [
     { id: `${t.id}-speed`, label: `${t.label} Speed`, detail: `×${1 + t.speedup}`,
-      spriteId: t.spriteId, speedMult: 1 + t.speedup, productivityMult: 1 },
+      spriteId: t.spriteId, speedMult: 1 + t.speedup, productivityMult: 1, powerMult: t.powerSpeedMult },
     { id: `${t.id}-extra`, label: `${t.label} Extra`, detail: `+${t.extraProducts * 100}%`,
-      spriteId: t.spriteId, speedMult: 1, productivityMult: 1 + t.extraProducts,
+      spriteId: t.spriteId, speedMult: 1, productivityMult: 1 + t.extraProducts, powerMult: t.powerExtraMult,
       speedVariantId: `${t.id}-speed` },
   ]),
+];
+
+export const PowerFuels: PowerFuel[] = [
+  { id: 'log',                  name: 'Log',                   icon: '🪵', spriteId: 1030, energyMJ: 1.5 },
+  { id: 'plant-fuel',           name: 'Plant Fuel',            icon: '🌿', spriteId: 1031, energyMJ: 1.5 },
+  { id: 'coal',                 name: 'Coal',                  icon: '⚫', spriteId: 1006, energyMJ: 6.3 },
+  { id: 'fire-ice',             name: 'Fire Ice',              icon: '🧊', spriteId: 1011, energyMJ: 12 },
+  { id: 'energetic-graphite',   name: 'Energetic Graphite',    icon: '◼',  spriteId: 1109, energyMJ: 12 },
+  { id: 'organic-crystal',      name: 'Organic Crystal',       icon: '🟢', spriteId: 1117, energyMJ: 12 },
+  { id: 'hydrogen',             name: 'Hydrogen',              icon: '🎈', spriteId: 1120, energyMJ: 9 },
+  { id: 'refined-oil',          name: 'Refined Oil',           icon: '🟫', spriteId: 1114, energyMJ: 12.6 },
+  { id: 'hydrogen-fuel-rod',    name: 'Hydrogen Fuel Rod',     icon: '⚡', spriteId: 1801, energyMJ: 40 },
+  { id: 'deuterium-fuel-rod',   name: 'Deuterium Fuel Rod',    icon: '⚡', spriteId: 1802, energyMJ: 500 },
+  { id: 'antimatter-fuel-rod',  name: 'Antimatter Fuel Rod',   icon: '⚡', spriteId: 1803, energyMJ: 7500 },
+  { id: 'accumulator-charged',  name: 'Full Accumulator',      icon: '🔋', spriteId: 2207, energyMJ: 180 },
+];
+
+const _thermalFuels  = ['log','plant-fuel','coal','fire-ice','energetic-graphite','organic-crystal','hydrogen','refined-oil','hydrogen-fuel-rod','deuterium-fuel-rod','antimatter-fuel-rod'];
+const _fusionFuels   = ['hydrogen-fuel-rod','deuterium-fuel-rod','antimatter-fuel-rod'];
+const _starFuels     = ['deuterium-fuel-rod','antimatter-fuel-rod'];
+const _exchangerFuels= ['accumulator-charged'];
+
+export const PowerPlants: PowerPlant[] = [
+  { id: 'thermal',    name: 'Thermal Power Plant',       icon: '🔥', spriteId: 2204, outputKW:  1800, fuelIds: _thermalFuels },
+  { id: 'fusion',     name: 'Mini Fusion Power Station', icon: '⚛️', spriteId: 2211, outputKW:  6000, fuelIds: _fusionFuels },
+  { id: 'star',       name: 'Artificial Star',           icon: '🌟', spriteId: 2212, outputKW: 25000, fuelIds: _starFuels },
+  { id: 'exchanger',  name: 'Energy Exchanger',          icon: '🔋', spriteId: 2209, outputKW: 45000, fuelIds: _exchangerFuels },
+  { id: 'wind',       name: 'Wind Turbine',              icon: '💨', spriteId: 2203, outputKW:   300, variableOutput: true },
+  { id: 'solar',      name: 'Solar Panel',               icon: '☀️', spriteId: 2205, outputKW:   360, variableOutput: true },
+  { id: 'geothermal', name: 'Geothermal Station',        icon: '🌋', spriteId: 2213, outputKW:  4000 },
 ];
 
 export const features: GameModule['features'] = { oilOptimiser: true };

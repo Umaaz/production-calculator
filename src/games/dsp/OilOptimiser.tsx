@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useGameData, SpriteIcon, TierPicker, ModifierPicker } from '../../calcShared';
-import { fmt } from '../../treeLogic';
+import { fmt, fmtPower } from '../../treeLogic';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -59,17 +59,17 @@ export function solveOilChain(h: number, r: number, g: number, mode: OilMode): O
 
 // ── Shared multiplier helpers ─────────────────────────────────────────────────
 
-function buildMults(modifierOptions: import('../../gameTypes').ModifierOption[], modifiers: OilModifiers) {
+export function buildMults(modifierOptions: import('../../gameTypes').ModifierOption[], modifiers: OilModifiers) {
   const get = (id: string) => modifierOptions.find(m => m.id === id) ?? modifierOptions[0];
   const pm = get(modifiers.plasma);
   const xm = get(modifiers.xray);
   const rm = get(modifiers.reformed);
   const am = get(modifiers.arc);
   return {
-    plasma:   { full: (pm?.speedMult ?? 1) * (pm?.productivityMult ?? 1), prod: pm?.productivityMult ?? 1 },
-    xray:     { full: xm?.speedMult ?? 1 },
-    reformed: { full: rm?.speedMult ?? 1 },
-    arc:      { full: (am?.speedMult ?? 1) * (am?.productivityMult ?? 1), prod: am?.productivityMult ?? 1 },
+    plasma:   { full: (pm?.speedMult ?? 1) * (pm?.productivityMult ?? 1), prod: pm?.productivityMult ?? 1, power: pm?.powerMult ?? 1 },
+    xray:     { full: xm?.speedMult ?? 1, power: xm?.powerMult ?? 1 },
+    reformed: { full: rm?.speedMult ?? 1, power: rm?.powerMult ?? 1 },
+    arc:      { full: (am?.speedMult ?? 1) * (am?.productivityMult ?? 1), prod: am?.productivityMult ?? 1, power: am?.powerMult ?? 1 },
   };
 }
 
@@ -387,6 +387,14 @@ export function OilChainTreeEntry({
   const refSprite = machineTiers['refinery']?.[0]?.spriteId;
   const refLabel  = machines['refinery']?.name ?? 'Refinery';
 
+  const refineryPowerKW = machineTiers['refinery']?.[0]?.workPowerKW ?? 0;
+  const smelterPowerKW  = smelterTier?.workPowerKW ?? 0;
+  const plasmaPowerKW   = solution.p > 0 ? refsPlasma(solution.p).exact   * refineryPowerKW * mults.plasma.power   : 0;
+  const xrayPowerKW     = solution.x > 0 ? refsXray(solution.x).exact     * refineryPowerKW * mults.xray.power     : 0;
+  const reformedPowerKW = solution.f > 0 ? refsReformed(solution.f).exact * refineryPowerKW * mults.reformed.power : 0;
+  const arcPowerKW      = solution.a > 0 ? refsArc(solution.a).exact      * smelterPowerKW  * mults.arc.power      : 0;
+  const totalOilPowerKW = plasmaPowerKW + xrayPowerKW + reformedPowerKW + arcPowerKW;
+
   const rawRow = (id: string, rate: number) => {
     if (rate <= 0) return null;
     const item = itemById[id];
@@ -402,6 +410,7 @@ export function OilChainTreeEntry({
         <span className="tree-cell tree-cell-machine"><span className="tree-tag raw">raw resource</span></span>
         <span className="tree-cell tree-cell-prolif" />
         <span className="tree-cell tree-cell-count" />
+        <span className="tree-cell tree-cell-power" />
         <span className="tree-cell tree-cell-belts" />
         <span className="tree-cell tree-cell-byproducts" />
       </div>
@@ -422,7 +431,7 @@ export function OilChainTreeEntry({
 
   return (
     <>
-      {/* Root row — modifier column shows the global oil default */}
+      {/* Root row — modifier column shows the global oil default; power column shows chain total */}
       <div className="tree-row">
         <span className="tree-cell tree-cell-item" style={{ paddingLeft: 8 }}>
           <button className="tree-caret" onClick={() => setExpanded(e => !e)} aria-label={expanded ? 'collapse' : 'expand'}>
@@ -438,6 +447,7 @@ export function OilChainTreeEntry({
           {showMods && <ModifierPicker modifierId={defaultModifierId} onSelect={onDefaultModifierChange} />}
         </span>
         <span className="tree-cell tree-cell-count" />
+        <span className="tree-cell tree-cell-power">{totalOilPowerKW > 0 && fmtPower(totalOilPowerKW)}</span>
         <span className="tree-cell tree-cell-belts" />
         <span className="tree-cell tree-cell-byproducts" />
       </div>
@@ -459,6 +469,7 @@ export function OilChainTreeEntry({
             <span className="tree-cell tree-cell-count">
               <span className="tree-machine-count">{refsPlasma(solution.p).ceil}×<span className="tree-machine-exact"> ({fmt(refsPlasma(solution.p).exact)})</span></span>
             </span>
+            <span className="tree-cell tree-cell-power">{plasmaPowerKW > 0 && fmtPower(plasmaPowerKW)}</span>
             <span className="tree-cell tree-cell-belts" />
             <span className="tree-cell tree-cell-byproducts" />
           </div>
@@ -478,6 +489,7 @@ export function OilChainTreeEntry({
             <span className="tree-cell tree-cell-count">
               <span className="tree-machine-count">{refsXray(solution.x).ceil}×<span className="tree-machine-exact"> ({fmt(refsXray(solution.x).exact)})</span></span>
             </span>
+            <span className="tree-cell tree-cell-power">{xrayPowerKW > 0 && fmtPower(xrayPowerKW)}</span>
             <span className="tree-cell tree-cell-belts" />
             <span className="tree-cell tree-cell-byproducts" />
           </div>
@@ -497,6 +509,7 @@ export function OilChainTreeEntry({
             <span className="tree-cell tree-cell-count">
               <span className="tree-machine-count">{refsReformed(solution.f).ceil}×<span className="tree-machine-exact"> ({fmt(refsReformed(solution.f).exact)})</span></span>
             </span>
+            <span className="tree-cell tree-cell-power">{reformedPowerKW > 0 && fmtPower(reformedPowerKW)}</span>
             <span className="tree-cell tree-cell-belts" />
             <span className="tree-cell tree-cell-byproducts" />
           </div>
@@ -516,6 +529,7 @@ export function OilChainTreeEntry({
             <span className="tree-cell tree-cell-count">
               <span className="tree-machine-count">{refsArc(solution.a).ceil}×<span className="tree-machine-exact"> ({fmt(refsArc(solution.a).exact)})</span></span>
             </span>
+            <span className="tree-cell tree-cell-power">{arcPowerKW > 0 && fmtPower(arcPowerKW)}</span>
             <span className="tree-cell tree-cell-belts" />
             <span className="tree-cell tree-cell-byproducts" />
           </div>

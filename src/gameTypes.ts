@@ -28,6 +28,7 @@ export interface MachineTier {
   speed: number;          // craft-speed multiplier (1.0 = baseline)
   spriteId?: number;
   speedDisplay?: string;  // overrides rendered speed badge (e.g. "90 / 45 / 30")
+  workPowerKW?: number;   // power draw at full work load, in kW
 }
 
 // A machine category groups one building type across its upgrade tiers.
@@ -52,7 +53,26 @@ export interface ModifierOption {
   spriteId?: number;
   speedMult: number;        // multiplier on machine craft-speed (1 = no effect)
   productivityMult: number; // multiplier on output quantity per craft (1 = no effect)
+  powerMult?: number;       // multiplier on machine power draw (1 = no change; >1 = more power)
   speedVariantId?: string;  // for extra-products options: ID of the speed-only equivalent at the same tier
+}
+
+export interface PowerFuel {
+  id: string;        // may match an itemId for icon/name lookup; fall back to own fields
+  name: string;
+  icon: string;
+  spriteId?: number;
+  energyMJ: number;
+}
+
+export interface PowerPlant {
+  id: string;
+  name: string;
+  icon: string;
+  spriteId?: number;
+  outputKW: number;         // rated output at 100 %
+  variableOutput?: boolean; // true when actual output varies (wind, solar) — user sets a % override
+  fuelIds?: string[];       // compatible PowerFuel ids; absent = no fuel needed
 }
 
 // The assembled data bundle consumed by ProductionCalculator.
@@ -67,6 +87,8 @@ export interface GameData {
   beltTiers: MachineTier[];
   sorterTiers: MachineTier[];
   modifierOptions: ModifierOption[];
+  powerPlants: PowerPlant[];
+  powerFuels: PowerFuel[];
   features: {
     oilOptimiser?: boolean;
   };
@@ -83,5 +105,7 @@ export interface GameModule {
   readonly Belts: MachineTier[];
   readonly Sorters?: MachineTier[];
   readonly Modifiers: ModifierOption[];
+  readonly PowerPlants?: PowerPlant[];
+  readonly PowerFuels?: PowerFuel[];
   readonly features?: { oilOptimiser?: boolean };
 }

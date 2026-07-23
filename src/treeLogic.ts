@@ -9,6 +9,12 @@ export function fmt(n: number): string {
   return Number.isInteger(r) ? String(r) : r.toFixed(2);
 }
 
+export function fmtPower(kW: number): string {
+  if (kW === 0) return '0 kW';
+  if (kW >= 1000) return `${fmt(kW / 1000)} MW`;
+  return `${fmt(kW)} kW`;
+}
+
 // ── Tier helpers ──────────────────────────────────────────────────────────────
 
 // Per-path override wins (keyed by full tree path, so the same item can be configured
@@ -45,6 +51,7 @@ export interface TreeNode {
   machine: string | null;
   tierId: string | null;
   machines: number;
+  powerKW: number;
   byproducts: { itemId: string; rate: number }[];
   children: TreeNode[];
   path: string;
@@ -92,14 +99,14 @@ export function buildTree(
   // Items managed by the oil optimiser stop the tree here.
   if (cfg.oilChainItemIds?.has(itemId)) {
     return {
-      itemId, rate, recipe: null, machine: null, tierId: null, machines: 0,
+      itemId, rate, recipe: null, machine: null, tierId: null, machines: 0, powerKW: 0,
       byproducts: [], children: [], path, cyclic: false, manuallyMined: false,
       recipeOverridden: false, modifierId, oilOptimised: true,
     };
   }
 
   const noRecipeNode = (cyclic: boolean): TreeNode => ({
-    itemId, rate, recipe: null, machine: null, tierId: null, machines: 0,
+    itemId, rate, recipe: null, machine: null, tierId: null, machines: 0, powerKW: 0,
     byproducts: [], children: [], path, cyclic, manuallyMined, recipeOverridden, modifierId,
     oilOptimised: false,
   });
@@ -125,6 +132,7 @@ export function buildTree(
 
   const perMachine   = (netQty * productivityMult * tier.speed * speedMult / recipe.time) * 60;
   const machines     = rate / perMachine;
+  const powerKW      = machines * (tier.workPowerKW ?? 0) * (mod?.powerMult ?? 1);
   const craftsPerMin = rate / (netQty * productivityMult);
 
   const nextAncestors = new Set(ancestors);
@@ -141,7 +149,7 @@ export function buildTree(
 
   return {
     itemId, rate, recipe, machine: recipe.machine, tierId: tier.id,
-    machines, byproducts, children, path, cyclic: false, manuallyMined: false, recipeOverridden, modifierId,
+    machines, powerKW, byproducts, children, path, cyclic: false, manuallyMined: false, recipeOverridden, modifierId,
     oilOptimised: false,
   };
 }
@@ -149,7 +157,7 @@ export function buildTree(
 // ── Aggregation ───────────────────────────────────────────────────────────────
 
 export interface CraftedEntry {
-  itemId: string; recipe: ProdRecipe; rate: number; machines: number;
+  itemId: string; recipe: ProdRecipe; rate: number; machines: number; powerKW: number;
   machine: string | null; tierId: string | null;
 }
 
@@ -175,10 +183,11 @@ export function aggregate(node: TreeNode, totals: Totals) {
   if (entry) {
     entry.rate += node.rate;
     entry.machines += node.machines;
+    entry.powerKW += node.powerKW;
   } else {
     totals.crafted[key] = {
       itemId: node.itemId, recipe: node.recipe,
-      rate: node.rate, machines: node.machines,
+      rate: node.rate, machines: node.machines, powerKW: node.powerKW,
       machine: node.machine, tierId: node.tierId,
     };
   }

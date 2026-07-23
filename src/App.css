@@ -797,7 +797,7 @@ body, html, #root {
 .tree-col-headers,
 .tree-row {
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) 100px 220px 160px 130px 110px 90px minmax(0, 1fr);
+  grid-template-columns: minmax(180px, 1fr) 100px 220px 160px 130px 110px 80px 90px minmax(0, 1fr);
   align-items: center;
   column-gap: 6px;
 }
@@ -818,6 +818,7 @@ body, html, #root {
 }
 .tree-col-header-rate,
 .tree-col-header-count,
+.tree-col-header-power,
 .tree-col-header-belts { text-align: right; padding-right: 6px; }
 
 .tree-row {
@@ -846,6 +847,7 @@ body, html, #root {
 .tree-cell-recipe .recipe-trigger { width: 100%; }
 .tree-cell-machine { gap: 5px; }
 .tree-cell-count { justify-content: flex-end; }
+.tree-cell-power { justify-content: flex-end; color: #c8a020; font-variant-numeric: tabular-nums; font-size: 12px; }
 .tree-cell-belts { justify-content: flex-end; padding-right: 6px; }
 .tree-belt-count { font-variant-numeric: tabular-nums; font-weight: 600; color: #8ab4d4; }
 .tree-cell-byproducts { overflow: visible; }
@@ -946,6 +948,63 @@ body, html, #root {
   font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
+.summary-power { color: #f0c040; font-weight: 400; margin-left: 2px; }
+.summary-power-total {
+  border-bottom: 1px solid rgba(240,192,64,0.2);
+  margin-bottom: 6px;
+  padding-bottom: 6px;
+}
+.summary-power-label { color: #f0c040; font-weight: 600; }
+.summary-power-val { color: #f0c040; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* ── Power Supply section ───────────────────────────────────────────────────── */
+
+.power-pickers {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.power-plant-trigger,
+.power-fuel-trigger { flex: 1; min-width: 0; }
+.power-pct-label {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.power-pct-input {
+  width: 52px;
+  box-sizing: border-box;
+  background: #12122a;
+  color: #c0c0e0;
+  border: 1px solid #2a2a50;
+  border-radius: 4px;
+  padding: 4px 5px;
+  font-size: 12px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.power-pct-input:focus { outline: none; border-color: #5555aa; }
+.power-pct-unit { display: flex; align-items: center; color: #55558a; font-size: 12px; }
+.power-result { display: flex; flex-direction: column; gap: 4px; }
+.power-result-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  padding: 4px 6px;
+  background: rgba(240,192,64,0.06);
+  border: 1px solid rgba(240,192,64,0.15);
+  border-radius: 5px;
+}
+.power-result-fuel { background: rgba(100,160,255,0.06); border-color: rgba(100,160,255,0.15); }
+.power-result-count { color: #f0c040; font-weight: 700; font-variant-numeric: tabular-nums; min-width: 48px; }
+.power-result-fuel .power-result-count { color: #88bbff; }
+.power-result-name { flex: 1; color: #c0c0e0; }
+.power-result-cap { color: #55558a; font-size: 11px; }
+.power-result-empty { color: #44447a; font-size: 12px; font-style: italic; }
 
 /* ── Recipe picker ─────────────────────────────────────────────────────────── */
 

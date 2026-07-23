@@ -1,6 +1,7 @@
 import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import ReactDOM from 'react-dom';
-import type { GameData, MachineTier } from './gameTypes';
+import type { GameData, MachineTier, PowerFuel, PowerPlant } from './gameTypes';
+import { fmt } from './treeLogic';
 
 // ── Game data context ─────────────────────────────────────────────────────────
 
@@ -103,6 +104,103 @@ export function TierPicker({ tiers, selectedId, onSelect, isOverridden, speedUni
         <span className="tier-trigger-info">
           <span className="tier-trigger-label">{selected.label}</span>
           <span className="tier-trigger-speed">×{selected.speedDisplay ?? selected.speed}{speedUnit}</span>
+        </span>
+        <span className="recipe-trigger-caret">▾</span>
+      </button>
+      {panel}
+    </>
+  );
+}
+
+// ── Power plant picker ────────────────────────────────────────────────────────
+
+export function PowerPlantPicker({ plants, selectedId, onSelect }: {
+  plants: PowerPlant[];
+  selectedId: string;
+  onSelect: (id: string) => void;
+}) {
+  const { open, close, toggle, panelPos, triggerRef, panelRef } = useDropdown();
+  const selected = plants.find(p => p.id === selectedId) ?? plants[0];
+
+  const panel = open ? ReactDOM.createPortal(
+    <div ref={panelRef} className="recipe-panel" style={{ top: panelPos.top, left: panelPos.left, minWidth: panelPos.width }}>
+      {plants.map(p => (
+        <button key={p.id}
+          className={`recipe-option tier-option${p.id === selected?.id ? ' is-selected' : ''}`}
+          onClick={() => { onSelect(p.id); close(); }}>
+          <SpriteIcon spriteId={p.spriteId} fallback={p.icon} size={24} />
+          <span className="tier-option-info">
+            <span className="recipe-option-name">{p.name}</span>
+            <span className="tier-option-speed">{fmt(p.outputKW / 1000)} MW</span>
+          </span>
+        </button>
+      ))}
+    </div>,
+    document.body
+  ) : null;
+
+  return (
+    <>
+      <button ref={triggerRef} className="recipe-trigger tier-trigger power-plant-trigger"
+        onClick={() => toggle(plants.length * 44, 200)}>
+        <SpriteIcon spriteId={selected?.spriteId} fallback={selected?.icon ?? '🏭'} size={20} />
+        <span className="tier-trigger-info">
+          <span className="tier-trigger-label">{selected?.name ?? '—'}</span>
+          <span className="tier-trigger-speed">{selected ? `${fmt(selected.outputKW / 1000)} MW` : ''}</span>
+        </span>
+        <span className="recipe-trigger-caret">▾</span>
+      </button>
+      {panel}
+    </>
+  );
+}
+
+// ── Power fuel picker ─────────────────────────────────────────────────────────
+
+export function PowerFuelPicker({ fuels, selectedId, onSelect }: {
+  fuels: PowerFuel[];
+  selectedId: string;
+  onSelect: (id: string) => void;
+}) {
+  const { itemById } = useGameData();
+  const { open, close, toggle, panelPos, triggerRef, panelRef } = useDropdown();
+  const selected = fuels.find(f => f.id === selectedId) ?? fuels[0];
+
+  const resolveIcon = (f: PowerFuel) => {
+    const item = itemById[f.id];
+    return { spriteId: item?.spriteId ?? f.spriteId, fallback: item?.icon ?? f.icon, name: item?.name ?? f.name };
+  };
+
+  const panel = open ? ReactDOM.createPortal(
+    <div ref={panelRef} className="recipe-panel" style={{ top: panelPos.top, left: panelPos.left, minWidth: panelPos.width }}>
+      {fuels.map(f => {
+        const { spriteId, fallback, name } = resolveIcon(f);
+        return (
+          <button key={f.id}
+            className={`recipe-option tier-option${f.id === selected?.id ? ' is-selected' : ''}`}
+            onClick={() => { onSelect(f.id); close(); }}>
+            <SpriteIcon spriteId={spriteId} fallback={fallback} size={24} />
+            <span className="tier-option-info">
+              <span className="recipe-option-name">{name}</span>
+              <span className="tier-option-speed">{f.energyMJ} MJ</span>
+            </span>
+          </button>
+        );
+      })}
+    </div>,
+    document.body
+  ) : null;
+
+  const { spriteId, fallback, name } = selected ? resolveIcon(selected) : { spriteId: undefined, fallback: '⛽', name: '—' };
+
+  return (
+    <>
+      <button ref={triggerRef} className="recipe-trigger tier-trigger power-fuel-trigger"
+        onClick={() => toggle(fuels.length * 44, 200)}>
+        <SpriteIcon spriteId={spriteId} fallback={fallback} size={20} />
+        <span className="tier-trigger-info">
+          <span className="tier-trigger-label">{name}</span>
+          <span className="tier-trigger-speed">{selected ? `${selected.energyMJ} MJ` : ''}</span>
         </span>
         <span className="recipe-trigger-caret">▾</span>
       </button>
