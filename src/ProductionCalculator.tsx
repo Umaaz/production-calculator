@@ -343,8 +343,8 @@ function TreeRow({ node, depth, expanded, toggle }: {
 
 const OIL_CHAIN_ITEM_IDS = new Set(['hydrogen', 'refined-oil', 'energetic-graphite']);
 
-export function ProductionCalculator({ gameId, gameData, gameLabel, gameIcon, onBack }: {
-  gameId: string; gameData: GameData; gameLabel: string; gameIcon: string; onBack: () => void;
+export function ProductionCalculator({ gameId, gameData, gameLabel, gameIcon, gameImg, onBack }: {
+  gameId: string; gameData: GameData; gameLabel: string; gameIcon: string; gameImg?: string; onBack: () => void;
 }) {
   const { itemById, craftableItems, recipesByOutput, recipeByOutput, machineTiers, machines, beltTiers, sorterTiers, modifierOptions, powerPlants, powerFuels, features } = gameData;
 
@@ -524,7 +524,10 @@ export function ProductionCalculator({ gameId, gameData, gameLabel, gameIcon, on
     <div id="calc-app">
       <div id="calc-toolbar">
         <button className="game-badge-btn" onClick={onBack} title="Change game">
-          {gameIcon} {gameLabel} ▾
+          {gameImg && <img src={`${process.env.PUBLIC_URL}/${gameImg}`} alt="" className="game-badge-bg" />}
+          <span className="game-badge-label">
+            {!gameImg && gameIcon} {gameLabel} ▾
+          </span>
         </button>
         <span className="calc-title">Production Calculator</span>
         <div className="spacer" />

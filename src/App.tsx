@@ -19,7 +19,9 @@ function GamePicker({ onSelect }: { onSelect: (id: string) => void }) {
           {GAMES.map(g => (
             <button key={g.id} className="game-card" style={{ borderColor: g.accent }}
               onClick={() => onSelect(g.id)}>
-              <span className="game-card-icon">{g.icon}</span>
+              {g.img
+                ? <img src={`${process.env.PUBLIC_URL}/${g.img}`} alt={g.label} className="game-card-img" />
+                : <span className="game-card-icon">{g.icon}</span>}
               <span className="game-card-label">{g.label}</span>
               <span className="game-card-count">{g.id in GAME_IMPORTERS ? 'Supported' : 'Coming soon'}</span>
             </button>
@@ -52,7 +54,10 @@ function App() {
   const toolbar = (
     <div id="calc-toolbar">
       <button className="game-badge-btn" onClick={() => setGameId(null)} title="Change game">
-        {game?.icon ?? '🏭'} {game?.label ?? gameId} ▾
+        {game?.img && <img src={`${process.env.PUBLIC_URL}/${game.img}`} alt="" className="game-badge-bg" />}
+        <span className="game-badge-label">
+          {!game?.img && (game?.icon ?? '🏭')} {game?.label ?? gameId} ▾
+        </span>
       </button>
       <span className="calc-title">Production Calculator</span>
       <div className="spacer" />
@@ -87,6 +92,7 @@ function App() {
       gameData={gameData}
       gameLabel={game?.label ?? gameId ?? ''}
       gameIcon={game?.icon ?? '🏭'}
+      gameImg={game?.img}
       onBack={() => setGameId(null)}
     />
   );
