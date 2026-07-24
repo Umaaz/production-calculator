@@ -91,6 +91,12 @@ export interface GameData {
   powerFuels: PowerFuel[];
   features: {
     oilOptimiser?: boolean;
+    proliferatorTiers?: Array<{
+      idPrefix: string;    // modifier IDs starting with this prefix belong to this tier
+      label: string;
+      spriteId: number;
+      sprayCapacity: number;
+    }>;
   };
 }
 
@@ -107,5 +113,5 @@ export interface GameModule {
   readonly Modifiers: ModifierOption[];
   readonly PowerPlants?: PowerPlant[];
   readonly PowerFuels?: PowerFuel[];
-  readonly features?: { oilOptimiser?: boolean };
+  readonly features?: GameData['features'];
 }

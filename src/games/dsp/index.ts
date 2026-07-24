@@ -298,4 +298,11 @@ export const PowerPlants: PowerPlant[] = [
   { id: 'geothermal', name: 'Geothermal Station',        icon: '🌋', spriteId: 2213, outputKW:  4800 },
 ];
 
-export const features: GameModule['features'] = { oilOptimiser: true };
+export const features: GameModule['features'] = {
+  oilOptimiser: true,
+  proliferatorTiers: [
+    { idPrefix: 'mk1', label: 'Mk.I Proliferator',   spriteId: 1141, sprayCapacity: 12 },
+    { idPrefix: 'mk2', label: 'Mk.II Proliferator',  spriteId: 1142, sprayCapacity: 24 },
+    { idPrefix: 'mk3', label: 'Mk.III Proliferator', spriteId: 1143, sprayCapacity: 60 },
+  ],
+};

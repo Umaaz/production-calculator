@@ -481,6 +481,40 @@ export function ProductionCalculator({ gameId, gameData, gameLabel, gameIcon, ga
     (totals ? Object.values(totals.crafted).reduce((s, e) => s + e.powerKW, 0) : 0) + oilPowerKW,
   [totals, oilPowerKW]);
 
+  const prolifTotals = useMemo<Record<string, number> | null>(() => {
+    const tiers = features.proliferatorTiers;
+    if (!tiers?.length || !tree) return null;
+    const result: Record<string, number> = {};
+
+    const walk = (node: TreeNode) => {
+      if (!node.manuallyMined && !node.cyclic && !node.oilOptimised && node.recipe) {
+        const tier = tiers.find(t => node.modifierId.startsWith(t.idPrefix + '-'));
+        if (tier) {
+          const inputPerMin = node.children.reduce((s, c) => s + c.rate, 0);
+          if (inputPerMin > 0)
+            result[tier.idPrefix] = (result[tier.idPrefix] ?? 0) + inputPerMin / tier.sprayCapacity;
+        }
+      }
+      node.children.forEach(walk);
+    };
+    walk(tree);
+
+    if (treeOilSolution) {
+      const sol = treeOilSolution;
+      const mults = buildMults(modifierOptions, oilModifiers);
+      const addOil = (modId: string, itemsPerMin: number) => {
+        const tier = tiers.find(t => modId.startsWith(t.idPrefix + '-'));
+        if (tier && itemsPerMin > 0)
+          result[tier.idPrefix] = (result[tier.idPrefix] ?? 0) + itemsPerMin / tier.sprayCapacity;
+      };
+      if (sol.p > 0) addOil(oilModifiers.plasma,   sol.crudeInput / mults.plasma.prod);
+      if (sol.f > 0) addOil(oilModifiers.reformed, 4 * sol.f);
+      if (sol.a > 0) addOil(oilModifiers.arc,      2 * sol.a / mults.arc.prod);
+    }
+
+    return Object.keys(result).length > 0 ? result : null;
+  }, [tree, features.proliferatorTiers, treeOilSolution, modifierOptions, oilModifiers]);
+
   const [selectedPowerPlantId, setSelectedPowerPlantId] = usePersisted(K('powerPlantId'), powerPlants[0]?.id ?? '');
   const [selectedPowerFuelId,  setSelectedPowerFuelId]  = usePersisted(K('powerFuelId'),  powerFuels[0]?.id ?? '');
   const [powerPlantPcts, setPowerPlantPcts] = usePersisted<Record<string, number>>(K('powerPlantPcts'), {});
@@ -655,6 +689,18 @@ export function ProductionCalculator({ gameId, gameData, gameLabel, gameIcon, ga
             </div>
 
             <div id="calc-summary">
+              {prolifTotals && features.proliferatorTiers && (
+                <div className="summary-block">
+                  <div className="summary-title">Proliferators / min</div>
+                  {features.proliferatorTiers.filter(t => prolifTotals[t.idPrefix] != null).map(t => (
+                    <div key={t.idPrefix} className="summary-row">
+                      <SpriteIcon spriteId={t.spriteId} fallback="🧪" size={20} />
+                      <span className="summary-name">{t.label}</span>
+                      <span className="summary-val">{fmt(prolifTotals[t.idPrefix])}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
               <div className="summary-block">
                 <div className="summary-title">Raw Resources / min</div>
                 {Object.entries(totals.raw).sort((a, b) => b[1] - a[1]).map(([id, r]) => (
