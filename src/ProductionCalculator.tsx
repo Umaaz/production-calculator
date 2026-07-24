@@ -618,9 +618,10 @@ export function ProductionCalculator({ gameId, gameData, gameLabel, gameIcon, ga
 
   const [checkedPaths, setCheckedPaths] = usePersisted<string[]>(K('checkedPaths'), []);
   const checked = useMemo(() => new Set(checkedPaths), [checkedPaths]);
-  const toggleCheck = useCallback((p: string) => setCheckedPaths(prev => {
+  const toggleCheck  = useCallback((p: string) => setCheckedPaths(prev => {
     if (prev.includes(p)) return prev.filter(x => x !== p); else return [...prev, p];
   }), [setCheckedPaths]);
+  const clearChecked = useCallback(() => setCheckedPaths([]), [setCheckedPaths]);
 
   const treeActions: TreeActions = useMemo(() => ({
     itemTierIds, itemModifierIds, beltCapacity,
@@ -743,7 +744,11 @@ export function ProductionCalculator({ gameId, gameData, gameLabel, gameIcon, ga
                 <span className="tree-col-header tree-col-header-power">Power</span>
                 <span className="tree-col-header tree-col-header-belts">Belts</span>
                 <span className="tree-col-header">Byproducts</span>
-                <span className="tree-col-header" />
+                <span className="tree-col-header tree-col-header-check">
+                  {checkedPaths.length > 0 && (
+                    <button className="tree-check-reset" onClick={clearChecked} title="Reset all marks">↺</button>
+                  )}
+                </span>
               </div>
               <TreeActionsCtx.Provider value={treeActions}>
               <div className="tree-scroll">

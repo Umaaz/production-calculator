@@ -875,6 +875,19 @@ body, html, #root {
 .tree-check-btn:hover { border-color: #5a5a90; color: #5a5a90; }
 .tree-check-btn.is-checked { background: #2a4a2a; border-color: #4a8a4a; color: #7fd18f; }
 .tree-cell-check { justify-content: center; }
+.tree-col-header-check { justify-content: center; }
+.tree-check-reset {
+  background: transparent;
+  border: 1px solid #2a2a50;
+  border-radius: 4px;
+  color: #5a5a90;
+  font-size: 13px;
+  width: 20px; height: 20px;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 0.1s, color 0.1s;
+}
+.tree-check-reset:hover { border-color: #8a8ac0; color: #c0c0ff; }
 
 /* Grid cells */
 .tree-cell {
