@@ -30,6 +30,8 @@ interface TreeActions {
   clearModifier: (path: string) => void;
   setRecipe: (path: string, recipeId: string) => void;
   clearRecipe: (path: string) => void;
+  checked: Set<string>;
+  toggleCheck: (path: string) => void;
 }
 const TreeActionsCtx = React.createContext<TreeActions | null>(null);
 const useTreeActions = (): TreeActions => {
@@ -178,7 +180,7 @@ function TreeRow({ node, depth, expanded, toggle }: {
   expanded: Set<string>; toggle: (p: string) => void;
 }) {
   const { itemById, machineTiers: allMachineTiers, machines, recipesByOutput, modifierOptions } = useGameData();
-  const { itemTierIds, itemModifierIds, beltCapacity, setTier, clearTier, setModifier, clearModifier, setRecipe, clearRecipe } = useTreeActions();
+  const { itemTierIds, itemModifierIds, beltCapacity, setTier, clearTier, setModifier, clearModifier, setRecipe, clearRecipe, checked, toggleCheck } = useTreeActions();
 
   const item = itemById[node.itemId];
   const hasChildren = node.children.length > 0;
@@ -206,10 +208,11 @@ function TreeRow({ node, depth, expanded, toggle }: {
 
   const beltExact = node.rate / beltCapacity;
   const beltCount = Math.ceil(beltExact - 1e-9);
+  const isChecked = checked.has(node.path);
 
   return (
     <>
-      <div className="tree-row">
+      <div className={`tree-row${isChecked ? ' is-checked' : ''}`}>
         {/* Col 1: item */}
         <span className="tree-cell tree-cell-item" style={{ paddingLeft: 8 + depth * 22 }}>
           <button
@@ -309,7 +312,7 @@ function TreeRow({ node, depth, expanded, toggle }: {
           )}
         </span>
 
-        {/* Col 8: byproducts */}
+        {/* Col 9: byproducts */}
         <span className="tree-cell tree-cell-byproducts">
           {node.byproducts.length > 0 && (
             <span className="tree-byproducts">
@@ -317,6 +320,15 @@ function TreeRow({ node, depth, expanded, toggle }: {
                 `${fmt(b.rate)} ${itemById[b.itemId]?.name ?? b.itemId}`).join(', ')}
             </span>
           )}
+        </span>
+
+        {/* Col 10: done checkmark */}
+        <span className="tree-cell tree-cell-check">
+          <button
+            className={`tree-check-btn${isChecked ? ' is-checked' : ''}`}
+            onClick={() => toggleCheck(node.path)}
+            title={isChecked ? 'Mark incomplete' : 'Mark complete'}
+          >✓</button>
         </span>
       </div>
 
@@ -495,10 +507,17 @@ export function ProductionCalculator({ gameId, gameData, gameLabel, gameIcon, on
   const collapseAll = useCallback(() => setExpanded(tree ? new Set([tree.path]) : new Set()), [tree]);
   const expandAll   = useCallback(() => { if (tree) setExpanded(collectPaths(tree)); }, [tree]);
 
+  const [checkedPaths, setCheckedPaths] = usePersisted<string[]>(K('checkedPaths'), []);
+  const checked = useMemo(() => new Set(checkedPaths), [checkedPaths]);
+  const toggleCheck = useCallback((p: string) => setCheckedPaths(prev => {
+    if (prev.includes(p)) return prev.filter(x => x !== p); else return [...prev, p];
+  }), [setCheckedPaths]);
+
   const treeActions: TreeActions = useMemo(() => ({
     itemTierIds, itemModifierIds, beltCapacity,
     setTier, clearTier, setModifier, clearModifier, setRecipe, clearRecipe,
-  }), [itemTierIds, itemModifierIds, beltCapacity, setTier, clearTier, setModifier, clearModifier, setRecipe, clearRecipe]);
+    checked, toggleCheck,
+  }), [itemTierIds, itemModifierIds, beltCapacity, setTier, clearTier, setModifier, clearModifier, setRecipe, clearRecipe, checked, toggleCheck]);
 
   return (
     <GameDataCtx.Provider value={gameData}>
@@ -608,6 +627,7 @@ export function ProductionCalculator({ gameId, gameData, gameLabel, gameIcon, on
                 <span className="tree-col-header tree-col-header-power">Power</span>
                 <span className="tree-col-header tree-col-header-belts">Belts</span>
                 <span className="tree-col-header">Byproducts</span>
+                <span className="tree-col-header" />
               </div>
               <TreeActionsCtx.Provider value={treeActions}>
               <div className="tree-scroll">

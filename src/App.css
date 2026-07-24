@@ -797,7 +797,7 @@ body, html, #root {
 .tree-col-headers,
 .tree-row {
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) 100px 220px 160px 130px 110px 80px 90px minmax(0, 1fr);
+  grid-template-columns: minmax(180px, 1fr) 100px 220px 160px 130px 110px 80px 90px minmax(0, 1fr) 32px;
   align-items: center;
   column-gap: 6px;
 }
@@ -827,6 +827,24 @@ body, html, #root {
   border-bottom: 1px solid rgba(28,28,56,0.5);
 }
 .tree-row:hover { background: rgba(255,255,255,0.03); }
+.tree-row.is-checked { opacity: 0.35; }
+.tree-row.is-checked:hover { opacity: 0.55; }
+
+.tree-check-btn {
+  width: 20px; height: 20px;
+  border-radius: 4px;
+  border: 1px solid #2a2a50;
+  background: transparent;
+  color: transparent;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: border-color 0.1s, background 0.1s, color 0.1s;
+}
+.tree-check-btn:hover { border-color: #5a5a90; color: #5a5a90; }
+.tree-check-btn.is-checked { background: #2a4a2a; border-color: #4a8a4a; color: #7fd18f; }
+.tree-cell-check { justify-content: center; }
 
 /* Grid cells */
 .tree-cell {
