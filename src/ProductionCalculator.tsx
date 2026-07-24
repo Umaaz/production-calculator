@@ -1,7 +1,7 @@
 import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { usePersisted, usePersistedPathMap } from './usePersisted';
 import ReactDOM from 'react-dom';
-import type { ProdRecipe, ProdItem, GameData } from './gameTypes';
+import type { ProdRecipe, ProdItem, GameData, PickerTab } from './gameTypes';
 import {
   GameDataCtx, useGameData, useDropdown,
   SpriteIcon, TierPicker, ModifierPicker, PowerPlantPicker, PowerFuelPicker,
@@ -90,6 +90,81 @@ function ItemPicker({ items, selectedId, onSelect }: {
         onClick={() => toggle(Math.min(filtered.length, 8) * 36 + 44, 220)}>
         <SpriteIcon spriteId={selected.spriteId} fallback={selected.icon} size={20} />
         <span className="item-picker-trigger-name">{selected.name}</span>
+        <span className="recipe-trigger-caret">▾</span>
+      </button>
+      {panel}
+    </>
+  );
+}
+
+// ── Layout-based (DSP-style) grid picker ─────────────────────────────────────
+
+const ROMAN = ['I','II','III','IV','V','VI','VII','VIII','IX','X'];
+
+function LayoutItemPicker({ items, selectedId, onSelect, layout, itemById }: {
+  items: ProdItem[];
+  selectedId: string;
+  onSelect: (id: string) => void;
+  layout: PickerTab[];
+  itemById: Record<string, ProdItem>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState(0);
+
+  const selected = items.find(it => it.id === selectedId) ?? items[0];
+  const craftableSet = useMemo(() => new Set(items.map(it => it.id)), [items]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [open]);
+
+  const panel = open ? ReactDOM.createPortal(
+    <>
+      <div className="dsp-picker-backdrop" onClick={() => setOpen(false)} />
+      <div className="dsp-picker-panel">
+        <div className="dsp-picker-tabs">
+          {layout.map((tab, i) => (
+            <button key={i}
+              className={`dsp-picker-tab${i === activeTab ? ' is-active' : ''}`}
+              onClick={() => setActiveTab(i)}>
+              {tab.label}
+            </button>
+          ))}
+        </div>
+        <div className="dsp-picker-grid">
+          {layout[activeTab].rows.map((row, ri) => (
+            <div key={ri} className="dsp-picker-row">
+              <span className="dsp-picker-row-label">{ROMAN[ri]}</span>
+              {row.map((itemId, ci) => {
+                const item = itemId ? itemById[itemId] : null;
+                if (!item) {
+                  return <span key={ci} className="dsp-picker-cell dsp-picker-cell--empty" />;
+                }
+                const craftable = craftableSet.has(item.id);
+                return (
+                  <button key={ci} title={item.name} disabled={!craftable}
+                    className={`dsp-picker-cell${!craftable ? ' dsp-picker-cell--raw' : ''}${craftable && item.id === selected?.id ? ' is-selected' : ''}`}
+                    onClick={craftable ? () => { onSelect(item.id); setOpen(false); } : undefined}>
+                    <SpriteIcon spriteId={item.spriteId} fallback={item.icon} size={46} />
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+    </>,
+    document.body
+  ) : null;
+
+  return (
+    <>
+      <button className="item-picker-trigger" onClick={() => setOpen(o => !o)}>
+        <SpriteIcon spriteId={selected?.spriteId} fallback={selected?.icon ?? '?'} size={20} />
+        <span className="item-picker-trigger-name">{selected?.name}</span>
         <span className="recipe-trigger-caret">▾</span>
       </button>
       {panel}
@@ -598,7 +673,11 @@ export function ProductionCalculator({ gameId, gameData, gameLabel, gameIcon, ga
           <div className="calc-row">
             <div className="calc-field">
               <span className="calc-label">I want to produce</span>
-              <ItemPicker items={craftableItems} selectedId={targetId} onSelect={setTargetId} />
+              {features.pickerLayout
+                ? <LayoutItemPicker items={craftableItems} selectedId={targetId} onSelect={setTargetId}
+                    layout={features.pickerLayout} itemById={itemById} />
+                : <ItemPicker items={craftableItems} selectedId={targetId} onSelect={setTargetId} />
+              }
             </div>
             <label className="calc-field">
               <span className="calc-label">Rate (per minute)</span>

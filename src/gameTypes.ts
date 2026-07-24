@@ -75,6 +75,11 @@ export interface PowerPlant {
   fuelIds?: string[];       // compatible PowerFuel ids; absent = no fuel needed
 }
 
+export interface PickerTab {
+  label: string;
+  rows: (string | null)[][];
+}
+
 // The assembled data bundle consumed by ProductionCalculator.
 export interface GameData {
   iconNamespace: string;           // CSS data-icon prefix, e.g. 'item' → data-icon="item.1001"
@@ -97,6 +102,7 @@ export interface GameData {
       spriteId: number;
       sprayCapacity: number;
     }>;
+    pickerLayout?: PickerTab[];
   };
 }
 
