@@ -97,7 +97,7 @@ export function buildTree(
   const modifierId = cfg.itemModifierIds[path] ?? cfg.defaultModifierId;
 
   // Items managed by the oil optimiser stop the tree here.
-  if (cfg.oilChainItemIds?.has(itemId)) {
+  if (cfg.oilChainItemIds?.has(itemId) && !manuallyMined) {
     return {
       itemId, rate, recipe: null, machine: null, tierId: null, machines: 0, powerKW: 0,
       byproducts: [], children: [], path, cyclic: false, manuallyMined: false,
