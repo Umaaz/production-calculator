@@ -610,7 +610,7 @@ function drawGroupBelts(
     if (g.topInputBelts === 0 && g.outputBelts === 0 && g.bottomInputBelts === 0) return;
 
     const px = tp(g.tileX, vx, ts);
-    const _ = tp(g.tileY, vy, ts);
+    tp(g.tileY, vy, ts);
     const pw = g.totalW * ts;
     const { topInputBelts: tib, outputBelts: ob, bottomInputBelts: bib,
             innerGap, sideExt, mW, mH, rows, cols, count } = g;
