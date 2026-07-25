@@ -12,6 +12,7 @@ import {
 } from './treeLogic';
 import { OilOptimiser, OilChainTreeEntry, solveOilChain, buildMults } from './games/dsp/OilOptimiser';
 import type { OilMode, OilModifiers } from './games/dsp/OilOptimiser';
+import { LayoutPlanner } from './LayoutPlanner';
 
 // ── Path-keyed state map ──────────────────────────────────────────────────────
 // Shared pattern for tier, modifier, and recipe per-path overrides.
@@ -438,7 +439,7 @@ export function ProductionCalculator({ gameId, gameData, gameLabel, gameIcon, ga
     return d;
   });
 
-  const [activeTab, setActiveTab] = usePersisted<'tree' | 'oil'>(K('activeTab'), 'tree');
+  const [activeTab, setActiveTab] = usePersisted<'tree' | 'oil' | 'layout'>(K('activeTab'), 'tree');
 
   const [selectedBeltId, setSelectedBeltId] = usePersisted(K('selectedBeltId'), beltTiers[0]?.id ?? '');
   // sorterTierId kept for future sorter-placement feature; not yet used in tree calculations
@@ -661,9 +662,15 @@ export function ProductionCalculator({ gameId, gameData, gameLabel, gameIcon, ga
             <button className={`calc-tab${activeTab === 'oil' ? ' is-active' : ''}`}
               onClick={() => setActiveTab('oil')}>DSP Oil Optimisation</button>
           )}
+          {tree && (
+            <button className={`calc-tab${activeTab === 'layout' ? ' is-active' : ''}`}
+              onClick={() => setActiveTab('layout')}>Layout</button>
+          )}
         </div>
 
-        {activeTab === 'oil' && features.oilOptimiser ? (
+        {activeTab === 'layout' && tree ? (
+          <LayoutPlanner tree={tree} gameData={gameData} />
+        ) : activeTab === 'oil' && features.oilOptimiser ? (
           <OilOptimiser
             refinerySpeed={(machineTiers['refinery']?.find(t => t.id === defaultTierIds['refinery']) ?? machineTiers['refinery']?.[0])?.speed ?? 1}
             treeDemands={oilDemands}
