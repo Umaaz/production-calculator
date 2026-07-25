@@ -610,7 +610,7 @@ function drawGroupBelts(
     if (g.topInputBelts === 0 && g.outputBelts === 0 && g.bottomInputBelts === 0) return;
 
     const px = tp(g.tileX, vx, ts);
-    const py = tp(g.tileY, vy, ts);
+    const _ = tp(g.tileY, vy, ts);
     const pw = g.totalW * ts;
     const { topInputBelts: tib, outputBelts: ob, bottomInputBelts: bib,
             innerGap, sideExt, mW, mH, rows, cols, count } = g;
@@ -974,6 +974,7 @@ export function LayoutPlanner({ tree, gameData }: Props) {
   const [viewport,   setViewport]   = useState({ x: 0, y: 0 });
   const [tileSize,   setTileSize]   = useState(DEFAULT_TILE_SIZE);
   const [beltTierId, setBeltTierId] = useState(() => gameData.beltTiers[0]?.id ?? '');
+  const [beltUtil,   setBeltUtil]   = useState(1.0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [overrides,  setOverrides]  = useState<Record<string, { tileX: number; tileY: number }>>({});
   const [drag,       setDrag]       = useState<Drag | null>(null);
@@ -991,10 +992,10 @@ export function LayoutPlanner({ tree, gameData }: Props) {
   }, [gameData]);
 
   const beltThroughput = useMemo(
-    () => gameData.beltTiers.find(b => b.id === beltTierId)?.speed
-       ?? gameData.beltTiers[0]?.speed
-       ?? Infinity,
-    [gameData, beltTierId],
+    () => (gameData.beltTiers.find(b => b.id === beltTierId)?.speed
+        ?? gameData.beltTiers[0]?.speed
+        ?? Infinity) * beltUtil,
+    [gameData, beltTierId, beltUtil],
   );
 
   const { groups, edges }       = useMemo(() => {
@@ -1120,6 +1121,23 @@ export function LayoutPlanner({ tree, gameData }: Props) {
             ))}
           </select>
         )}
+        {(() => {
+          const rawSpeed = gameData.beltTiers.find(b => b.id === beltTierId)?.speed ?? gameData.beltTiers[0]?.speed ?? 0;
+          return (
+            <select
+              className="layout-select"
+              value={beltUtil}
+              onChange={e => setBeltUtil(Number(e.target.value))}
+              title="Belt utilisation — lower values leave headroom to prevent starvation of machines at the end of a belt run"
+            >
+              {([1.0, 0.75, 0.6] as const).map(u => (
+                <option key={u} value={u}>
+                  {Math.round(u * 100)}% util ({Math.round(rawSpeed * u)}/min effective)
+                </option>
+              ))}
+            </select>
+          );
+        })()}
         <span className="layout-stat">{machines.length} machines · {belts.length} belts · {tileSize}px/tile</span>
         <div className="spacer" />
         {sel && (
