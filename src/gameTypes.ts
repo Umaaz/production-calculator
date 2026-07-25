@@ -103,7 +103,30 @@ export interface GameData {
       sprayCapacity: number;
     }>;
     pickerLayout?: PickerTab[];
+    layoutMachines?: LayoutMachineSpec[];
   };
+}
+
+export interface LayoutMachineSpec {
+  machineId: string; // matches recipe.machine category id
+  tileW: number;     // footprint width in game tiles
+  tileH: number;     // footprint height in game tiles
+  // How items move between conveyor belts and this building.
+  // 'sorter'   — belt runs alongside; sorter arm bridges to machine (DSP default)
+  // 'inserter' — same spacing, different visual (Factorio)
+  // 'direct'   — belt connects flush to a port on the building face
+  beltAccess?: 'sorter' | 'inserter' | 'direct';
+  // Belt lane layout: 'in2_out1', 'in3_out1', 'in6_out1', etc.
+  // Determines how many horizontal belt lanes sit above (inputs) and below (outputs).
+  layoutId?: string;
+  // Explicit port positions for 'direct' buildings (omit to auto-infer from edges)
+  ports?: LayoutPort[];
+}
+
+export interface LayoutPort {
+  side: 'N' | 'S' | 'E' | 'W'; // which face the port is on
+  offset: number;               // tiles along that face from the NW corner
+  io: 'in' | 'out';
 }
 
 // The contract every game module (src/games/<id>/index.ts) must satisfy.
