@@ -949,6 +949,24 @@ body, html, #root {
 .tree-icon { flex-shrink: 0; font-size: 15px; width: 20px; text-align: center; }
 .tree-name { color: #d0d0f0; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+.tree-open-btn {
+  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid #2a2a50;
+  border-radius: 4px;
+  color: #5a5a90;
+  font-size: 11px;
+  width: 18px; height: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  opacity: 0;
+  transition: opacity 0.1s, color 0.1s, border-color 0.1s;
+}
+.tree-row:hover .tree-open-btn { opacity: 1; }
+.summary-row:hover .summary-open-btn { opacity: 1; }
+.tree-open-btn:hover { color: #a0b0ff; border-color: #5060a0; }
+
 .tree-row-io { font-size: 11px; }
 .tree-row-io:hover { background: rgba(255,255,255,0.02); }
 .tree-row-io .tree-name { color: #9090b8; font-weight: 400; }

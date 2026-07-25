@@ -33,7 +33,10 @@ function GamePicker({ onSelect }: { onSelect: (id: string) => void }) {
 }
 
 function App() {
-  const [gameId, setGameId] = useState<string | null>(null);
+  const [gameId, setGameId] = useState<string | null>(() => {
+    const g = new URLSearchParams(window.location.search).get('game');
+    return g && g in GAME_IMPORTERS ? g : null;
+  });
   const [gameData, setGameData] = useState<GameData | null>(null);
   const [loading, setLoading] = useState(false);
 

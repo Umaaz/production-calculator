@@ -22,6 +22,7 @@ import { LayoutPlanner } from './LayoutPlanner';
 // Avoids prop-drilling callbacks and per-path overrides 12 levels through TreeRow.
 
 interface TreeActions {
+  gameId: string;
   itemTierIds: Record<string, string>;
   itemModifierIds: Record<string, string>;
   beltCapacity: number;
@@ -256,7 +257,7 @@ function TreeRow({ node, depth, expanded, toggle }: {
   expanded: Set<string>; toggle: (p: string) => void;
 }) {
   const { itemById, machineTiers: allMachineTiers, machines, recipesByOutput, modifierOptions } = useGameData();
-  const { itemTierIds, itemModifierIds, beltCapacity, setTier, clearTier, setModifier, clearModifier, setRecipe, clearRecipe, checked, toggleCheck } = useTreeActions();
+  const { gameId, itemTierIds, itemModifierIds, beltCapacity, setTier, clearTier, setModifier, clearModifier, setRecipe, clearRecipe, checked, toggleCheck } = useTreeActions();
 
   const item = itemById[node.itemId];
   const hasChildren = node.children.length > 0;
@@ -300,6 +301,18 @@ function TreeRow({ node, depth, expanded, toggle }: {
           </button>
           <SpriteIcon spriteId={item?.spriteId} fallback={item?.icon ?? '❓'} size={22} className="tree-icon" />
           <span className="tree-name">{item?.name ?? node.itemId}</span>
+          {depth > 0 && node.recipe && !node.oilOptimised && (
+            <button
+              className="tree-open-btn"
+              title={`Open ${item?.name ?? node.itemId} subtree in new tab`}
+              onClick={e => {
+                e.stopPropagation();
+                const base = window.location.href.split('?')[0];
+                const p = new URLSearchParams({ game: gameId, item: node.itemId, rate: String(node.rate) });
+                window.open(`${base}?${p}`, '_blank');
+              }}
+            >↗</button>
+          )}
         </span>
 
         {/* Col 2: rate */}
@@ -431,6 +444,16 @@ export function ProductionCalculator({ gameId, gameData, gameLabel, gameIcon, ga
 
   const [targetId, setTargetId] = usePersisted(K('targetId'), craftableItems[0]?.id ?? '');
   const [rateStr, setRateStr]   = usePersisted(K('rateStr'), '60');
+
+  // Apply ?item= and ?rate= query params on first load (e.g. when opening a subtree link).
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    const qi = p.get('item'); const qr = p.get('rate');
+    if (qi && craftableItems.some(c => c.id === qi)) setTargetId(qi);
+    if (qr && isFinite(parseFloat(qr)))              setRateStr(qr);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const [defaultTierIds, setDefaultTierIds] = usePersisted<Record<string, string>>(K('defaultTierIds'), () => {
@@ -631,10 +654,10 @@ export function ProductionCalculator({ gameId, gameData, gameLabel, gameIcon, ga
   }, [gameId]);
 
   const treeActions: TreeActions = useMemo(() => ({
-    itemTierIds, itemModifierIds, beltCapacity,
+    gameId, itemTierIds, itemModifierIds, beltCapacity,
     setTier, clearTier, setModifier, clearModifier, setRecipe, clearRecipe,
     checked, toggleCheck,
-  }), [itemTierIds, itemModifierIds, beltCapacity, setTier, clearTier, setModifier, clearModifier, setRecipe, clearRecipe, checked, toggleCheck]);
+  }), [gameId, itemTierIds, itemModifierIds, beltCapacity, setTier, clearTier, setModifier, clearModifier, setRecipe, clearRecipe, checked, toggleCheck]);
 
   return (
     <GameDataCtx.Provider value={gameData}>
@@ -862,6 +885,15 @@ export function ProductionCalculator({ gameId, gameData, gameLabel, gameIcon, ga
                                   {fmt(rate)}/m
                                   <span className="summary-exact"> ({fmt(rate / beltCapacity)} belts)</span>
                                 </span>
+                                <button
+                                  className="tree-open-btn summary-open-btn"
+                                  title={`Open ${item?.name ?? itemId} subtree in new tab`}
+                                  onClick={() => {
+                                    const base = window.location.href.split('?')[0];
+                                    const p = new URLSearchParams({ game: gameId, item: itemId, rate: String(rate) });
+                                    window.open(`${base}?${p}`, '_blank');
+                                  }}
+                                >↗</button>
                               </div>
                               {machineName && (
                                 <div className="summary-line summary-line-machine">
