@@ -74,6 +74,7 @@ export interface TreeBuildConfig {
   machineTiers: Record<string, MachineTier[]>;
   modifierOptions: ModifierOption[];
   oilChainItemIds?: Set<string>;
+  oilChainExcludedRecipeIds?: Set<string>; // recipe IDs that bypass oil-chain intercept
 }
 
 export function buildTree(
@@ -96,13 +97,17 @@ export function buildTree(
 
   const modifierId = cfg.itemModifierIds[path] ?? cfg.defaultModifierId;
 
-  // Items managed by the oil optimiser stop the tree here.
+  // Items managed by the oil optimiser stop the tree here — unless the
+  // effective recipe is one that bypasses the oil chain (e.g. coal smelting for graphite).
   if (cfg.oilChainItemIds?.has(itemId) && !manuallyMined) {
-    return {
-      itemId, rate, recipe: null, machine: null, tierId: null, machines: 0, powerKW: 0,
-      byproducts: [], children: [], path, cyclic: false, manuallyMined: false,
-      recipeOverridden: false, modifierId, oilOptimised: true,
-    };
+    const effectiveId = effectiveRecipeId ?? candidates?.[0]?.id ?? '';
+    if (!cfg.oilChainExcludedRecipeIds?.has(effectiveId)) {
+      return {
+        itemId, rate, recipe: null, machine: null, tierId: null, machines: 0, powerKW: 0,
+        byproducts: [], children: [], path, cyclic: false, manuallyMined: false,
+        recipeOverridden: false, modifierId, oilOptimised: true,
+      };
+    }
   }
 
   const noRecipeNode = (cyclic: boolean): TreeNode => ({

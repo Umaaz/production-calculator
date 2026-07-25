@@ -513,6 +513,27 @@ body, html, #root {
   flex-shrink: 0;
 }
 
+.toolbar-github-link {
+  display: flex;
+  align-items: center;
+  color: #5a5a90;
+  text-decoration: none;
+  transition: color 0.1s;
+}
+.toolbar-github-link:hover { color: #c0c0ff; }
+
+.toolbar-reset-btn {
+  background: transparent;
+  border: 1px solid #3a3a6a;
+  border-radius: 4px;
+  color: #8888b0;
+  font-size: 12px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: border-color 0.1s, color 0.1s;
+}
+.toolbar-reset-btn:hover { border-color: #c04a4a; color: #e08080; }
+
 .calc-title {
   font-weight: 700;
   font-size: 14px;

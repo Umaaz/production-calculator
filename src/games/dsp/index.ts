@@ -277,7 +277,7 @@ export const ItemRecipes: ProdRecipe[] = [
   // ── Fuel rods ─────────────────────────────────────────────────────────────
   { id: 'r-hydrogen-fuel-rod',   machine: 'assembler', time: 6,  outputs: [{ item: 'hydrogen-fuel-rod',   qty: 2 }], inputs: [{ item: 'titanium-ingot', qty: 1 }, { item: 'hydrogen', qty: 10 }] },
   { id: 'r-deuterium-fuel-rod',  machine: 'assembler', time: 12,  outputs: [{ item: 'deuterium-fuel-rod',  qty: 2 }], inputs: [{ item: 'titanium-alloy', qty: 1 }, { item: 'super-magnetic-ring', qty: 1 }, { item: 'deuterium', qty: 20 }] },
-  { id: 'r-antimatter-fuel-rod', machine: 'assembler', time: 24, outputs: [{ item: 'antimatter-fuel-rod', qty: 2 }], inputs: [{ item: 'annihilation-constraint-sphere', qty: 1 }, { item: 'titanium-alloy', qty: 1 }, { item: 'hydrogen', qty: 12 }, { item: 'antimatter', qty: 12 }] },
+  { id: 'r-antimatter-fuel-rod', machine: 'assembler', time: 24, noExtraProducts: true, outputs: [{ item: 'antimatter-fuel-rod', qty: 2 }], inputs: [{ item: 'annihilation-constraint-sphere', qty: 1 }, { item: 'titanium-alloy', qty: 1 }, { item: 'hydrogen', qty: 12 }, { item: 'antimatter', qty: 12 }] },
 
   // ── Explosive components ──────────────────────────────────────────────────
   { id: 'r-combustible-unit',       machine: 'assembler', time: 3,  outputs: [{ item: 'combustible-unit',       qty: 1 }], inputs: [{ item: 'coal', qty: 3 }] },
@@ -371,7 +371,7 @@ export const BuildingRecipes: ProdRecipe[] = [
   { id: 'rb-carrier-rocket',  machine: 'assembler', time: 6,  outputs: [{ item: 'small-carrier-rocket',   qty: 2 }], inputs: [{ item: 'titanium-alloy', qty: 2 }, { item: 'deuterium', qty: 10 }, { item: 'electromagnetic-turbine', qty: 2 }, { item: 'dyson-sphere-component', qty: 2 }] },
 
   // ── Intermediate components ────────────────────────────────────────────────
-  { id: 'rb-constraint-sphere', machine: 'collider', time: 20, outputs: [{ item: 'annihilation-constraint-sphere', qty: 1 }], inputs: [{ item: 'particle-container', qty: 1 }, { item: 'processor', qty: 1 }] },
+  { id: 'rb-constraint-sphere', machine: 'assembler', time: 20, outputs: [{ item: 'annihilation-constraint-sphere', qty: 1 }], inputs: [{ item: 'particle-container', qty: 1 }, { item: 'processor', qty: 1 }] },
 
   // ── Military defense buildings ────────────────────────────────────────────
   { id: 'rb-gauss-turret',               machine: 'assembler', time:  4, outputs: [{ item: 'gauss-turret',               qty: 1 }], inputs: [{ item: 'iron-ingot', qty: 8 }, { item: 'gear', qty: 8 }, { item: 'circuit-board', qty: 2 }, { item: 'magnetic-coil', qty: 4 }] },
