@@ -368,7 +368,7 @@ export const BuildingRecipes: ProdRecipe[] = [
   { id: 'rb-solar-sail',      machine: 'assembler', time: 4,  outputs: [{ item: 'solar-sail',             qty: 2 }], inputs: [{ item: 'graphene', qty: 1 }, { item: 'photon-combiner', qty: 1 }] },
   { id: 'rb-frame-material',  machine: 'assembler', time: 6,  outputs: [{ item: 'frame-material',         qty: 1 }], inputs: [{ item: 'carbon-nanotube', qty: 4 }, { item: 'titanium-alloy', qty: 1 }, { item: 'high-purity-silicon', qty: 1 }] },
   { id: 'rb-dyson-component', machine: 'assembler', time: 8,  outputs: [{ item: 'dyson-sphere-component', qty: 1 }], inputs: [{ item: 'frame-material', qty: 3 }, { item: 'solar-sail', qty: 3 }, { item: 'processor', qty: 3 }] },
-  { id: 'rb-carrier-rocket',  machine: 'assembler', time: 6,  outputs: [{ item: 'small-carrier-rocket',   qty: 2 }], inputs: [{ item: 'titanium-alloy', qty: 2 }, { item: 'deuterium', qty: 10 }, { item: 'electromagnetic-turbine', qty: 2 }, { item: 'dyson-sphere-component', qty: 2 }] },
+  { id: 'rb-carrier-rocket',  machine: 'assembler', time: 6,  outputs: [{ item: 'small-carrier-rocket',   qty: 2 }], inputs: [{ item: 'dyson-sphere-component', qty: 2 }, { item: 'deuterium-fuel-rod', qty: 4 }, { item: 'quantum-chip', qty: 2 }] },
 
   // ── Intermediate components ────────────────────────────────────────────────
   { id: 'rb-constraint-sphere', machine: 'assembler', time: 20, outputs: [{ item: 'annihilation-constraint-sphere', qty: 1 }], inputs: [{ item: 'particle-container', qty: 1 }, { item: 'processor', qty: 1 }] },
@@ -516,41 +516,44 @@ export const features: GameModule['features'] = {
     { idPrefix: 'mk2', label: 'Mk.II Proliferator',  spriteId: 1142, sprayCapacity: 24 },
     { idPrefix: 'mk3', label: 'Mk.III Proliferator', spriteId: 1143, sprayCapacity: 60 },
   ],
+  layoutMachines: [
+    { machineId: 'assembler', tileW: 3, tileH: 3, beltAccess: 'sorter', layoutId: 'in3_out1' },
+    { machineId: 'smelter',   tileW: 3, tileH: 3, beltAccess: 'sorter', layoutId: 'in2_out1' },
+    { machineId: 'chemical',  tileW: 3, tileH: 3, beltAccess: 'sorter', layoutId: 'in3_out2' },
+    { machineId: 'refinery',  tileW: 3, tileH: 3, beltAccess: 'sorter', layoutId: 'in2_out2' },
+    { machineId: 'lab',       tileW: 3, tileH: 3, beltAccess: 'sorter', layoutId: 'in6_out1' },
+    { machineId: 'collider',  tileW: 5, tileH: 5, beltAccess: 'sorter', layoutId: 'in2_out1' },
+    // Mining machines output directly onto a belt (no sorter arm)
+    { machineId: 'mining',    tileW: 2, tileH: 2, beltAccess: 'direct',
+      ports: [{ side: 'S', offset: 0, io: 'out' }] },
+  ],
   pickerLayout: [
     {
       label: 'Items',
       rows: [
           ['iron-ore', 'copper-ore', 'stone', 'coal', 'silicon-ore', 'titanium-ore', 'water', 'crude-oil', 'hydrogen', 'deuterium', 'antimatter', 'core-element', 'critical-photon', 'kimberlite'],
-        ['iron-ingot','copper-ingot','high-purity-silicon','titanium-ingot','stone-brick','energetic-graphite',null,'graphene','plastic',null, null,null, null, null],
-        ['magnet','magnetic-coil', 'crystal-silicon', 'titanium-alloy', 'glass','diamond', null, null, null, null, null, null, null, null],
-        ['steel','electric-motor', null, 'titanium-glass', 'prism', null, null, 'titanium-crystal', null, null,null,null,null,null],
-        ['refined-oil','hydrogen','sulfuric-acid','organic-crystal','carbon-nanotube','strange-matter','antimatter',null,null,null,null,null],
-        ['electromagnetic-matrix','energy-matrix','structure-matrix','information-matrix','gravity-matrix','universe-matrix',null,null,null,null,null,null,null,null],
-        // VII — fuel
-        ['log','plant-fuel','coal','fire-ice','energetic-graphite','organic-crystal',null,'hydrogen','refined-oil',null,'hydrogen-fuel-rod','deuterium-fuel-rod','antimatter-fuel-rod',null],
-        // VIII — military components & ammo
-        ['combustible-unit','explosive-unit','crystal-explosive-unit','thruster','fuel-thruster','ion-thruster','magnum-ammo-box','titanium-ammo-box','superalloy-ammo-box','shell-set','high-explosive-shell-set','crystal-shell-set',null,null],
-        // VIII — capsules, missiles & Dark Fog loot
-        ['plasma-capsule','antimatter-capsule','em-jamming-capsule','em-suppression-capsule','missile-set','supersonic-missile-set','gravity-missile-set',null,'storage-unit','silicon-based-neuron','matter-recombinator','negentropy-singularity','virtual-particle','energy-shard'],
+        ['iron-ingot','copper-ingot','stone-brick', 'energetic-graphite', 'high-purity-silicon','titanium-ingot','sulfuric-acid','refined-oil','hydrogen-fuel-rod','deuterium-fuel-rod','antimatter-fuel-rod', null,'missile-set', 'fractal-silicon'],
+        ['magnet','magnetic-coil', 'glass', 'diamond', 'crystal-silicon', 'titanium-alloy', 'combustible-unit', 'plastic', 'organic-crystal', 'graphene', 'annihilation-constraint-sphere', 'magnum-ammo-box', 'supersonic-missile-set', 'optical-grating-crystal'],
+        ['steel','circuit-board','prism', 'electric-motor', 'microcrystalline-component', null, 'explosive-unit','strange-matter', 'titanium-crystal', 'carbon-nanotube', 'particle-broadband', 'titanium-ammo-box', 'gravity-missile-set','spiniform-crystal'],
+        ['gear','plasma-exciter','photon-combiner','electromagnetic-turbine','processor',null,'crystal-explosive-unit','casimir-crystal','titanium-glass','plane-filter','quantum-chip','superalloy-ammo-box','shell-set', 'unipolar-magnet'],
+        ['thruster','fuel-thruster','ion-thruster','super-magnetic-ring','particle-container', null, null, null, null, null, null,'plasma-capsule','high-explosive-shell-set', 'fire-ice'],
+        [null, null, null, null, 'graviton-lens', null, null, 'solar-sail', 'frame-material', 'dyson-sphere-component', 'small-carrier-rocket', 'antimatter-capsule','crystal-shell-set', 'log' ],
+        ['electromagnetic-matrix', 'energy-matrix', 'structure-matrix', 'information-matrix', 'gravity-matrix', 'universe-matrix', 'storage-unit','energy-shard', 'silicon-based-neuron','negentropy-singularity','matter-recombinator', 'em-jamming-capsule', 'em-suppression-capsule', 'plant-fuel'  ]
       ],
     },
     {
       label: 'Buildings',
       rows: [
         // I — power
-        ['tesla-tower','wireless-power-tower','wind-turbine','thermal-power-plant','solar-panel','accumulator','ray-receiver','mini-fusion-power-plant','satellite-substation','artificial-star',null,null,null,null],
+        ['tesla-tower','wireless-power-tower','satellite-substation','wind-turbine','thermal-power-plant','solar-panel',null,'mini-fusion-power-plant',null,'accumulator',null,'ray-receiver','artificial-star'],
         // II — logistics & storage
-        ['conveyor-belt-mk1','conveyor-belt-mk2','conveyor-belt-mk3','sorter-mk1','sorter-mk2','sorter-mk3','storage-mk1','storage-mk2','storage-tank','logistics-station','interstellar-logistics-station',null,null,null],
+        ['conveyor-belt-mk1','conveyor-belt-mk2','conveyor-belt-mk3',null,null,null,'spray-coater','storage-mk1','storage-mk2','storage-tank',null,'logistics-station','interstellar-logistics-station',null],
         // III — production & processing
-        ['mining-machine','advanced-mining-machine','water-pump','oil-extractor','arc-smelter','plane-smelter','assembling-machine-mk1','assembling-machine-mk2','assembling-machine-mk3','oil-refinery','chemical-plant','miniature-particle-collider','spray-coater','fractionator'],
+        ['sorter-mk1','sorter-mk2','sorter-mk3',null,'mining-machine','advanced-mining-machine','water-pump','oil-extractor','oil-refinery','fractionator','chemical-plant', null,'miniature-particle-collider'],
         // IV — research & Dyson
-        ['matrix-lab','emrail-ejector','vertical-launching-silo','solar-sail','frame-material','dyson-sphere-component','small-carrier-rocket','annihilation-constraint-sphere',null,null,null,null,null,null],
+        ['arc-smelter','plane-smelter', null,'assembling-machine-mk1','assembling-machine-mk2','assembling-machine-mk3',null,'matrix-lab',null,null,'emrail-ejector','vertical-launching-silo'],
         // V — military defense buildings
-        ['gauss-turret','laser-turret','implosion-cannon','magnetized-plasma-cannon','missile-turret','jammer-tower','signal-tower','planetary-shield-generator','battlefield-analysis-base','ground-plasma-cannon',null,null,null,null],
-        // VI — Dark Fog loot
-        ['storage-unit','silicon-based-neuron','matter-recombinator','negentropy-singularity','virtual-particle','energy-shard',null,null,null,null,null,null,null,null],
-        // VII — reserved
-        [null,null,null,null,null,null,null,null,null,null,null,null,null,null],
+        ['gauss-turret','missile-turret','implosion-cannon','laser-turret','magnetized-plasma-cannon','ground-plasma-cannon','battlefield-analysis-base','jammer-tower','signal-tower','planetary-shield-generator'],
       ],
     },
   ],
