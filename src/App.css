@@ -596,6 +596,80 @@ body, html, #root {
   border-color: #6655cc;
 }
 
+/* Multi-target controls */
+.calc-targets-row {
+  align-items: flex-start;
+  gap: 10px;
+}
+.calc-targets-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.calc-target-entry {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.calc-target-rate {
+  background: #0a0a18;
+  border: 1px solid #2c2c55;
+  border-radius: 6px;
+  color: #e0e0f0;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  width: 90px;
+}
+.calc-target-rate:focus { outline: none; border-color: #6655cc; }
+.calc-target-unit { color: #55558a; font-size: 12px; }
+.calc-target-remove {
+  background: transparent;
+  border: 1px solid #2a1a2a;
+  border-radius: 4px;
+  color: #604060;
+  font-size: 14px;
+  width: 22px; height: 22px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.1s, border-color 0.1s;
+}
+.calc-target-remove:hover { color: #e07080; border-color: #804060; }
+.calc-target-add {
+  align-self: flex-start;
+  background: transparent;
+  border: 1px dashed #2c2c55;
+  border-radius: 6px;
+  color: #55558a;
+  font-size: 12px;
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: color 0.1s, border-color 0.1s;
+}
+.calc-target-add:hover { color: #a0a0e0; border-color: #5050a0; }
+
+/* Tree section divider (shown when multiple targets are displayed) */
+.tree-section-divider {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #7070b0;
+  background: #0c0c20;
+  border-top: 1px solid #1a1a38;
+  border-bottom: 1px solid #1a1a38;
+  margin-top: 4px;
+}
+.tree-section-divider:first-child { margin-top: 0; border-top: none; }
+.tree-section-rate {
+  margin-left: auto;
+  color: #5a5a88;
+  font-weight: 400;
+}
+
 /* Item picker */
 .item-picker-trigger {
   display: inline-flex;

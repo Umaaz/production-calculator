@@ -462,15 +462,30 @@ export function ProductionCalculator({ gameId, gameData, gameLabel, gameIcon, ga
   // Namespace every persisted key by game so switching games doesn't bleed state.
   const K = (suffix: string) => `pcalc:${gameId}:${suffix}`;
 
-  const [targetId, setTargetId] = usePersisted(K('targetId'), craftableItems[0]?.id ?? '');
-  const [rateStr, setRateStr]   = usePersisted(K('rateStr'), '60');
+  type Target = { itemId: string; rateStr: string };
+  const [targets, setTargets] = usePersisted<Target[]>(K('targets'), [
+    { itemId: craftableItems[0]?.id ?? '', rateStr: '60' },
+  ]);
+
+  const updateTarget = useCallback((i: number, patch: Partial<Target>) =>
+    setTargets(ts => ts.map((t, j) => j === i ? { ...t, ...patch } : t)), [setTargets]);
+  const removeTarget = useCallback((i: number) =>
+    setTargets(ts => ts.length > 1 ? ts.filter((_, j) => j !== i) : ts), [setTargets]);
+  const addTarget = useCallback(() =>
+    setTargets(ts => [...ts, { itemId: craftableItems[0]?.id ?? '', rateStr: '60' }]),
+    [setTargets, craftableItems]);
 
   // Apply ?item= and ?rate= query params on first load (e.g. when opening a subtree link).
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
     const qi = p.get('item'); const qr = p.get('rate');
-    if (qi && craftableItems.some(c => c.id === qi)) setTargetId(qi);
-    if (qr && isFinite(parseFloat(qr)))              setRateStr(qr);
+    if (qi && craftableItems.some(c => c.id === qi)) {
+      setTargets(ts => {
+        const next = [...ts];
+        next[0] = { itemId: qi, rateStr: qr && isFinite(parseFloat(qr)) ? qr : (next[0]?.rateStr ?? '60') };
+        return next;
+      });
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -521,24 +536,26 @@ export function ProductionCalculator({ gameId, gameData, gameLabel, gameIcon, ga
 
   const beltTier     = beltTiers.find(t => t.id === selectedBeltId) ?? beltTiers[0];
   const beltCapacity = beltTier.speed;
-  const rate = Math.max(0, parseFloat(rateStr) || 0);
 
-  const tree = useMemo(() => {
-    if (!recipeByOutput[targetId] || rate <= 0) return null;
-    const cfg: TreeBuildConfig = {
-      defaultTierIds, itemTierIds, selectedRecipes, defaultRecipeIds,
-      defaultModifierId: currentDefaultModifierId, itemModifierIds,
-      itemById, recipesByOutput, machineTiers, modifierOptions,
-      oilChainItemIds: features.oilOptimiser ? OIL_CHAIN_ITEM_IDS : undefined,
-      oilChainExcludedRecipeIds: features.oilOptimiser ? new Set(['r-graphite']) : undefined,
-    };
-    return buildTree(targetId, rate, cfg, new Set(), '');
+  const cfg = useMemo<TreeBuildConfig>(() => ({
+    defaultTierIds, itemTierIds, selectedRecipes, defaultRecipeIds,
+    defaultModifierId: currentDefaultModifierId, itemModifierIds,
+    itemById, recipesByOutput, machineTiers, modifierOptions,
+    oilChainItemIds: features.oilOptimiser ? OIL_CHAIN_ITEM_IDS : undefined,
+    oilChainExcludedRecipeIds: features.oilOptimiser ? new Set(['r-graphite']) : undefined,
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [targetId, rate, defaultTierIds, itemTierIds, selectedRecipes, defaultRecipeIds,
-      currentDefaultModifierId, itemModifierIds, itemById, recipesByOutput, machineTiers, modifierOptions]);
+  }), [defaultTierIds, itemTierIds, selectedRecipes, defaultRecipeIds,
+      currentDefaultModifierId, itemModifierIds, itemById, recipesByOutput, machineTiers, modifierOptions, features.oilOptimiser]);
+
+  const trees = useMemo(() =>
+    targets.map(t => {
+      const rate = Math.max(0, parseFloat(t.rateStr) || 0);
+      if (!recipeByOutput[t.itemId] || rate <= 0) return null;
+      return buildTree(t.itemId, rate, cfg, new Set(), '');
+    }),
+  [targets, cfg, recipeByOutput]);
 
   const itemsWithAltRecipes = useMemo(() => {
-    if (!tree) return [];
     const seen = new Set<string>();
     const result: ProdItem[] = [];
     const walk = (node: TreeNode) => {
@@ -550,20 +567,21 @@ export function ProductionCalculator({ gameId, gameData, gameLabel, gameIcon, ga
       }
       node.children.forEach(walk);
     };
-    walk(tree);
+    trees.forEach(tree => { if (tree) walk(tree); });
     return result;
-  }, [tree, itemById, recipesByOutput]);
+  }, [trees, itemById, recipesByOutput]);
 
   const totals = useMemo(() => {
-    if (!tree) return null;
+    const valid = trees.filter(Boolean) as TreeNode[];
+    if (!valid.length) return null;
     const t: Totals = { raw: {}, machines: {}, crafted: {} };
-    aggregate(tree, t);
+    valid.forEach(tree => aggregate(tree, t));
     return t;
-  }, [tree]);
+  }, [trees]);
 
   const oilDemands = useMemo(() => {
     const demands = { h: 0, r: 0, g: 0 };
-    if (!tree || !features.oilOptimiser) return demands;
+    if (!features.oilOptimiser) return demands;
     const walk = (node: TreeNode) => {
       if (node.oilOptimised) {
         if (node.itemId === 'hydrogen')            demands.h += node.rate;
@@ -572,9 +590,9 @@ export function ProductionCalculator({ gameId, gameData, gameLabel, gameIcon, ga
       }
       node.children.forEach(walk);
     };
-    walk(tree);
+    trees.forEach(tree => { if (tree) walk(tree); });
     return demands;
-  }, [tree, features.oilOptimiser]);
+  }, [trees, features.oilOptimiser]);
 
   const treeOilSolution = useMemo(() => {
     if (!features.oilOptimiser) return null;
@@ -605,7 +623,7 @@ export function ProductionCalculator({ gameId, gameData, gameLabel, gameIcon, ga
 
   const prolifTotals = useMemo<Record<string, number> | null>(() => {
     const tiers = features.proliferatorTiers;
-    if (!tiers?.length || !tree) return null;
+    if (!tiers?.length || !trees.some(Boolean)) return null;
     const result: Record<string, number> = {};
     const cap = (tier: typeof tiers[number]) =>
       selfSprayProlif ? (tier.selfSprayCapacity ?? tier.sprayCapacity) : tier.sprayCapacity;
@@ -621,7 +639,7 @@ export function ProductionCalculator({ gameId, gameData, gameLabel, gameIcon, ga
       }
       node.children.forEach(walk);
     };
-    walk(tree);
+    trees.forEach(tree => { if (tree) walk(tree); });
 
     if (treeOilSolution) {
       const sol = treeOilSolution;
@@ -637,7 +655,7 @@ export function ProductionCalculator({ gameId, gameData, gameLabel, gameIcon, ga
     }
 
     return Object.keys(result).length > 0 ? result : null;
-  }, [tree, features.proliferatorTiers, treeOilSolution, modifierOptions, oilModifiers, selfSprayProlif]);
+  }, [trees, features.proliferatorTiers, treeOilSolution, modifierOptions, oilModifiers, selfSprayProlif]);
 
   const [selectedPowerPlantId, setSelectedPowerPlantId] = usePersisted(K('powerPlantId'), powerPlants[0]?.id ?? '');
   const [selectedPowerFuelId,  setSelectedPowerFuelId]  = usePersisted(K('powerFuelId'),  powerFuels[0]?.id ?? '');
@@ -653,17 +671,24 @@ export function ProductionCalculator({ gameId, gameData, gameLabel, gameIcon, ga
   const setSelectedPlantPct = (pct: number) => setPowerPlantPcts(prev => ({ ...prev, [selectedPlant!.id]: Math.min(200, Math.max(0, pct)) }));
 
   // Expand all nodes whenever tree structure changes (not just tier/modifier tweaks).
-  const structuralKey = `${targetId}:${rate}:${JSON.stringify(selectedRecipes)}:${JSON.stringify(defaultRecipeIds)}`;
+  const structuralKey = `${JSON.stringify(targets.map(t => t.itemId + ':' + t.rateStr))}:${JSON.stringify(selectedRecipes)}:${JSON.stringify(defaultRecipeIds)}`;
   useEffect(() => {
-    if (tree) setExpanded(collectPaths(tree));
+    const allPaths = new Set<string>();
+    trees.forEach(tree => { if (tree) collectPaths(tree).forEach(p => allPaths.add(p)); });
+    if (allPaths.size) setExpanded(allPaths);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [structuralKey]);
 
   const toggleNode  = useCallback((p: string) => setExpanded(prev => {
     const next = new Set(prev); if (next.has(p)) next.delete(p); else next.add(p); return next;
   }), []);
-  const collapseAll = useCallback(() => setExpanded(tree ? new Set([tree.path]) : new Set()), [tree]);
-  const expandAll   = useCallback(() => { if (tree) setExpanded(collectPaths(tree)); }, [tree]);
+  const collapseAll = useCallback(() =>
+    setExpanded(new Set(trees.filter(Boolean).map(t => t!.path))), [trees]);
+  const expandAll   = useCallback(() => {
+    const allPaths = new Set<string>();
+    trees.forEach(tree => { if (tree) collectPaths(tree).forEach(p => allPaths.add(p)); });
+    setExpanded(allPaths);
+  }, [trees]);
 
   const [checkedPaths, setCheckedPaths] = usePersisted<string[]>(K('checkedPaths'), []);
   const checked = useMemo(() => new Set(checkedPaths), [checkedPaths]);
@@ -709,14 +734,14 @@ export function ProductionCalculator({ gameId, gameData, gameLabel, gameIcon, ga
             <button className={`calc-tab${activeTab === 'oil' ? ' is-active' : ''}`}
               onClick={() => setActiveTab('oil')}>DSP Oil Optimisation</button>
           )}
-          {tree && (
+          {trees[0] && (
             <button className={`calc-tab${activeTab === 'layout' ? ' is-active' : ''}`}
               onClick={() => setActiveTab('layout')}>Layout</button>
           )}
         </div>
 
-        {activeTab === 'layout' && tree ? (
-          <LayoutPlanner tree={tree} gameData={gameData} />
+        {activeTab === 'layout' && trees[0] ? (
+          <LayoutPlanner tree={trees[0]} gameData={gameData} />
         ) : activeTab === 'oil' && features.oilOptimiser ? (
           <OilOptimiser
             refinerySpeed={(machineTiers['refinery']?.find(t => t.id === defaultTierIds['refinery']) ?? machineTiers['refinery']?.[0])?.speed ?? 1}
@@ -735,19 +760,28 @@ export function ProductionCalculator({ gameId, gameData, gameLabel, gameIcon, ga
           />
         ) : (
         <><div id="calc-controls">
-          <div className="calc-row">
-            <div className="calc-field">
-              <span className="calc-label">I want to produce</span>
-              {features.pickerLayout
-                ? <LayoutItemPicker items={craftableItems} selectedId={targetId} onSelect={setTargetId}
-                    layout={features.pickerLayout} itemById={itemById} />
-                : <ItemPicker items={craftableItems} selectedId={targetId} onSelect={setTargetId} />
-              }
+          <div className="calc-row calc-targets-row">
+            <span className="calc-label">I want to produce</span>
+            <div className="calc-targets-list">
+              {targets.map((t, i) => (
+                <div key={i} className="calc-target-entry">
+                  {features.pickerLayout
+                    ? <LayoutItemPicker items={craftableItems} selectedId={t.itemId}
+                        onSelect={id => updateTarget(i, { itemId: id })}
+                        layout={features.pickerLayout} itemById={itemById} />
+                    : <ItemPicker items={craftableItems} selectedId={t.itemId}
+                        onSelect={id => updateTarget(i, { itemId: id })} />
+                  }
+                  <input className="calc-target-rate" type="number" min={0} value={t.rateStr}
+                    onChange={e => updateTarget(i, { rateStr: e.target.value })} />
+                  <span className="calc-target-unit">/min</span>
+                  {targets.length > 1 && (
+                    <button className="calc-target-remove" onClick={() => removeTarget(i)} title="Remove">×</button>
+                  )}
+                </div>
+              ))}
+              <button className="calc-target-add" onClick={addTarget}>+ Add item</button>
             </div>
-            <label className="calc-field">
-              <span className="calc-label">Rate (per minute)</span>
-              <input type="number" min={0} value={rateStr} onChange={e => setRateStr(e.target.value)} />
-            </label>
           </div>
 
           <div className="calc-row calc-tiers-row">
@@ -788,7 +822,7 @@ export function ProductionCalculator({ gameId, gameData, gameLabel, gameIcon, ga
           )}
         </div>
 
-        {tree && totals ? (
+        {trees.some(Boolean) && totals ? (
           <div id="calc-results">
             <div id="calc-tree">
               <div className="tree-head">
@@ -816,7 +850,18 @@ export function ProductionCalculator({ gameId, gameData, gameLabel, gameIcon, ga
               </div>
               <TreeActionsCtx.Provider value={treeActions}>
               <div className="tree-scroll">
-                <TreeRow node={tree} depth={0} expanded={expanded} toggle={toggleNode} />
+                {trees.map((tree, i) => tree && (
+                  <React.Fragment key={i}>
+                    {trees.length > 1 && (
+                      <div className="tree-section-divider">
+                        <SpriteIcon spriteId={itemById[targets[i].itemId]?.spriteId} fallback={itemById[targets[i].itemId]?.icon ?? '❓'} size={14} />
+                        {itemById[targets[i].itemId]?.name ?? targets[i].itemId}
+                        <span className="tree-section-rate">{fmt(Math.max(0, parseFloat(targets[i].rateStr) || 0))}/min</span>
+                      </div>
+                    )}
+                    <TreeRow node={tree} depth={0} expanded={expanded} toggle={toggleNode} />
+                  </React.Fragment>
+                ))}
                 {treeOilSolution && (
                   <OilChainTreeEntry
                     solution={treeOilSolution}
