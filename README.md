@@ -1,46 +1,56 @@
-# Getting Started with Create React App
+# Production Calculator
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A production-chain calculator for factory games, currently supporting **Dyson Sphere Program**.
 
-## Available Scripts
+## Features
 
-In the project directory, you can run:
+### Production Tree
+- Set **multiple output targets** simultaneously — e.g. 10 Quantum Chips/min *and* 10 Diamonds/min — and get a combined ingredient tree with aggregated totals.
+- Per-node overrides for machine tier, recipe variant, and proliferator modifier.
+- Mark nodes complete with checkmarks to track build progress.
+- Open any sub-tree in a new tab via the ↗ button (or the `?game=dsp&item=<id>&rate=<n>` URL params directly).
 
-### `npm start`
+### Recipe Tooltips
+Hover any item name or icon — in the production tree *or* the item picker modal — to see a DSP-styled tooltip showing the recipe inputs, outputs, machine type, and craft time.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+### Summary Panel
+The right-hand panel aggregates across all active targets:
+- **Raw resources / min** — total mined inputs
+- **Machines (total)** — fractional and ceiling count per tier
+- **Recipe totals / min** — per-item throughput, belt count, and power
+- **Proliferators / min** — spray consumption per tier, with an optional *self-spray* toggle that accounts for the extra-products bonus when proliferators are themselves proliferated (Mk.III: ×1.25 effective capacity)
+- **Power supply** — plants and fuel needed to cover production power draw
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+### Belt Utilisation
+The belt tier picker in the Layout and production tree includes a **utilisation selector** (100% / 75% / 60%). Lower settings reserve headroom to prevent machines at the end of long tap lines from starving.
 
-### `npm test`
+### Layout Planner
+Visual tile-based layout for machine groups:
+- Auto-arranges machines into rows based on belt throughput and utilisation
+- Draws belt lanes, splitters/mergers, and sorter arms
+- Pan and zoom canvas; select groups to inspect
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+### DSP Oil Optimisation
+Dedicated tab for solving the crude-oil cracking chain (plasma refining, X-ray cracking, reformed hydrogen, arc-smelted graphite) with configurable modifier overrides.
 
-### `npm run build`
+## URL Parameters
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+| Param  | Description                                      |
+|--------|--------------------------------------------------|
+| `game` | Game ID to load without the picker (`dsp`)       |
+| `item` | Item ID to pre-select as the first target        |
+| `rate` | Rate (per minute) for the first target           |
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+Example: `http://localhost:3000?game=dsp&item=quantum-chip&rate=60`
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+## Development
 
-### `npm run eject`
+```bash
+npm start      # dev server at http://localhost:3000
+npm test       # run tests
+npm run build  # production build → build/
+```
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+## Adding a Game
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
-
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
+Each game lives in `src/games/<id>/index.ts` and must export the `GameModule` interface from `src/gameTypes.ts`. Register it in `src/App.tsx` in the `GAME_IMPORTERS` map.
