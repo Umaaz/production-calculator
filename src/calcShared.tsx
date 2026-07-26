@@ -1,6 +1,6 @@
 import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import ReactDOM from 'react-dom';
-import type { GameData, MachineTier, PowerFuel, PowerPlant } from './gameTypes';
+import type { GameData, MachineTier, PowerFuel, PowerPlant, ProdRecipe } from './gameTypes';
 import { fmt } from './treeLogic';
 
 // ── Game data context ─────────────────────────────────────────────────────────
@@ -266,5 +266,79 @@ export function ModifierPicker({ modifierId, onSelect, options }: {
       </button>
       {panel}
     </>
+  );
+}
+
+// ── Recipe tooltip ─────────────────────────────────────────────────────────────
+
+export function RecipeTooltip({ recipe, itemId, x, y }: {
+  recipe: ProdRecipe; itemId: string; x: number; y: number;
+}) {
+  const { itemById, machines, machineTiers } = useGameData();
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Clamp to viewport after first paint
+  const [adj, setAdj] = useState<{ dx: number; dy: number }>({ dx: 0, dy: 0 });
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const dx = x + r.width  > window.innerWidth  - 8 ? -(r.width  + 20) : 0;
+    const dy = y + r.height > window.innerHeight - 8 ? -(r.height + 20) : 0;
+    setAdj({ dx, dy });
+  }, [x, y]);
+
+  const item = itemById[itemId];
+  const machName   = machines[recipe.machine]?.name ?? recipe.machine;
+  const machSprite = machineTiers[recipe.machine]?.[0]?.spriteId;
+  const machIcon   = machines[recipe.machine]?.icon ?? '🏭';
+
+  return ReactDOM.createPortal(
+    <div ref={ref} className="recipe-tooltip" style={{ left: x + adj.dx, top: y + adj.dy }}>
+      <div className="rtt-header">
+        <SpriteIcon spriteId={item?.spriteId} fallback={item?.icon ?? '❓'} size={28} />
+        <span className="rtt-item-name">{item?.name ?? itemId}</span>
+      </div>
+
+      <div className="rtt-divider" />
+
+      <div className="rtt-machine-row">
+        <SpriteIcon spriteId={machSprite} fallback={machIcon} size={16} />
+        <span className="rtt-machine-name">{machName}</span>
+        <span className="rtt-craft-time">⏱ {recipe.time}s</span>
+      </div>
+
+      <div className="rtt-divider" />
+
+      <div className="rtt-section-label">Inputs</div>
+      {recipe.inputs.map(inp => {
+        const it = itemById[inp.item];
+        return (
+          <div key={inp.item} className="rtt-io-row">
+            <SpriteIcon spriteId={it?.spriteId} fallback={it?.icon ?? '?'} size={18} />
+            <span className="rtt-qty">×{inp.qty}</span>
+            <span className="rtt-io-name">{it?.name ?? inp.item}</span>
+          </div>
+        );
+      })}
+
+      <div className="rtt-arrow">▼</div>
+
+      <div className="rtt-section-label">Output{recipe.outputs.length > 1 ? 's' : ''}</div>
+      {recipe.outputs.map(out => {
+        const it = itemById[out.item];
+        return (
+          <div key={out.item} className={`rtt-io-row${out.item === itemId ? ' rtt-primary' : ''}`}>
+            <SpriteIcon spriteId={it?.spriteId} fallback={it?.icon ?? '?'} size={18} />
+            <span className="rtt-qty">×{out.qty}</span>
+            <span className="rtt-io-name">{it?.name ?? out.item}</span>
+          </div>
+        );
+      })}
+
+      {recipe.label && <div className="rtt-recipe-label">{recipe.label}</div>}
+      {recipe.noExtraProducts && <div className="rtt-note">⚠ Extra Products not applicable</div>}
+    </div>,
+    document.body,
   );
 }

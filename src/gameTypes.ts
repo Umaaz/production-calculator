@@ -101,6 +101,7 @@ export interface GameData {
       label: string;
       spriteId: number;
       sprayCapacity: number;
+      selfSprayCapacity?: number; // effective capacity when proliferators are themselves proliferated
     }>;
     pickerLayout?: PickerTab[];
     layoutMachines?: LayoutMachineSpec[];

@@ -196,6 +196,11 @@ export const Items: ProdItem[] = [
   { id: 'negentropy-singularity',  name: 'Negentropy Singularity',  icon: '🌑', spriteId: 5204, raw: true },
   { id: 'virtual-particle',        name: 'Virtual Particle',        icon: '✨', spriteId: 5205, raw: true },
   { id: 'energy-shard',            name: 'Energy Shard',            icon: '💠', spriteId: 5206, raw: true },
+
+  // ── Proliferators ────────────────────────────────────────────────
+  { id: 'pro-mk1', name: 'Proliferators MK.1', icon: '⚙', spriteId: 1141 },
+  { id: 'pro-mk2', name: 'Proliferators MK.2', icon: '⚙', spriteId: 1142 },
+  { id: 'pro-mk3', name: 'Proliferators MK.3', icon: '⚙', spriteId: 1143 },
 ];
 
 // ── Item Recipes ─────────────────────────────────────────────────────────────
@@ -249,7 +254,7 @@ export const ItemRecipes: ProdRecipe[] = [
   { id: 'r-carbon-nanotube', machine: 'chemical', time: 4, outputs: [{ item: 'carbon-nanotube', qty: 2 }], inputs: [{ item: 'graphene', qty: 3 }, { item: 'titanium-ingot', qty: 1 }] },
 
   // Collider
-  { id: 'r-strange-matter', machine: 'collider', time: 8, noExtraProducts: true, outputs: [{ item: 'strange-matter', qty: 1 }],                        inputs: [{ item: 'particle-container', qty: 2 }, { item: 'iron-ingot', qty: 2 }, { item: 'deuterium', qty: 10 }] },
+  { id: 'r-strange-matter', machine: 'collider', time: 8, outputs: [{ item: 'strange-matter', qty: 1 }],                        inputs: [{ item: 'particle-container', qty: 2 }, { item: 'iron-ingot', qty: 2 }, { item: 'deuterium', qty: 10 }] },
   { id: 'r-antimatter',     machine: 'collider', time: 2, noExtraProducts: true, outputs: [{ item: 'antimatter', qty: 2 }, { item: 'hydrogen', qty: 2 }], inputs: [{ item: 'critical-photon', qty: 2 }] },
 
   // Alternate recipes
@@ -368,8 +373,12 @@ export const BuildingRecipes: ProdRecipe[] = [
   { id: 'rb-solar-sail',      machine: 'assembler', time: 4,  outputs: [{ item: 'solar-sail',             qty: 2 }], inputs: [{ item: 'graphene', qty: 1 }, { item: 'photon-combiner', qty: 1 }] },
   { id: 'rb-frame-material',  machine: 'assembler', time: 6,  outputs: [{ item: 'frame-material',         qty: 1 }], inputs: [{ item: 'carbon-nanotube', qty: 4 }, { item: 'titanium-alloy', qty: 1 }, { item: 'high-purity-silicon', qty: 1 }] },
   { id: 'rb-dyson-component', machine: 'assembler', time: 8,  outputs: [{ item: 'dyson-sphere-component', qty: 1 }], inputs: [{ item: 'frame-material', qty: 3 }, { item: 'solar-sail', qty: 3 }, { item: 'processor', qty: 3 }] },
-  { id: 'rb-carrier-rocket',  machine: 'assembler', time: 6,  outputs: [{ item: 'small-carrier-rocket',   qty: 2 }], inputs: [{ item: 'dyson-sphere-component', qty: 2 }, { item: 'deuterium-fuel-rod', qty: 4 }, { item: 'quantum-chip', qty: 2 }] },
+  { id: 'rb-carrier-rocket',  machine: 'assembler', time: 6,  outputs: [{ item: 'small-carrier-rocket',   qty: 1 }], inputs: [{ item: 'dyson-sphere-component', qty: 2 }, { item: 'deuterium-fuel-rod', qty: 4 }, { item: 'quantum-chip', qty: 2 }] },
 
+  // ── Proliferators ────────────────────────────────────────────────
+  { id: 'rb-pro-mk1', machine: 'assembler', time: .5, outputs: [{ item: 'pro-mk1', qty: 1 }], inputs: [{ item: 'coal', qty: 1 }] },
+  { id: 'rb-pro-mk2', machine: 'assembler', time: 1, outputs: [{ item: 'pro-mk2', qty: 1 }], inputs: [{ item: 'pro-mk1', qty: 2 }, {item:'diamond', qty:1}] },
+  { id: 'rb-pro-mk3', machine: 'assembler', time: 2, outputs: [{ item: 'pro-mk3', qty: 1 }], inputs: [{ item: 'pro-mk2', qty: 2 }, {item:'carbon-nanotube', qty:1}] },
   // ── Intermediate components ────────────────────────────────────────────────
   { id: 'rb-constraint-sphere', machine: 'assembler', time: 20, outputs: [{ item: 'annihilation-constraint-sphere', qty: 1 }], inputs: [{ item: 'particle-container', qty: 1 }, { item: 'processor', qty: 1 }] },
 
@@ -512,9 +521,9 @@ export const PowerPlants: PowerPlant[] = [
 export const features: GameModule['features'] = {
   oilOptimiser: true,
   proliferatorTiers: [
-    { idPrefix: 'mk1', label: 'Mk.I Proliferator',   spriteId: 1141, sprayCapacity: 12 },
-    { idPrefix: 'mk2', label: 'Mk.II Proliferator',  spriteId: 1142, sprayCapacity: 24 },
-    { idPrefix: 'mk3', label: 'Mk.III Proliferator', spriteId: 1143, sprayCapacity: 60 },
+    { idPrefix: 'mk1', label: 'Mk.I Proliferator',   spriteId: 1141, sprayCapacity: 12, selfSprayCapacity: 12 * 1.125 },
+    { idPrefix: 'mk2', label: 'Mk.II Proliferator',  spriteId: 1142, sprayCapacity: 24, selfSprayCapacity: 24 * 1.20  },
+    { idPrefix: 'mk3', label: 'Mk.III Proliferator', spriteId: 1143, sprayCapacity: 60, selfSprayCapacity: 60 * 1.25  },
   ],
   layoutMachines: [
     { machineId: 'assembler', tileW: 3, tileH: 3, beltAccess: 'sorter', layoutId: 'in3_out1' },
@@ -531,12 +540,12 @@ export const features: GameModule['features'] = {
     {
       label: 'Items',
       rows: [
-          ['iron-ore', 'copper-ore', 'stone', 'coal', 'silicon-ore', 'titanium-ore', 'water', 'crude-oil', 'hydrogen', 'deuterium', 'antimatter', 'core-element', 'critical-photon', 'kimberlite'],
+          ['iron-ore', 'copper-ore', 'stone', 'coal', 'silicon-ore', 'titanium-ore', 'water', 'crude-oil', 'hydrogen', 'deuterium', 'antimatter', 'virtual-particle', 'critical-photon', 'kimberlite'],
         ['iron-ingot','copper-ingot','stone-brick', 'energetic-graphite', 'high-purity-silicon','titanium-ingot','sulfuric-acid','refined-oil','hydrogen-fuel-rod','deuterium-fuel-rod','antimatter-fuel-rod', null,'missile-set', 'fractal-silicon'],
         ['magnet','magnetic-coil', 'glass', 'diamond', 'crystal-silicon', 'titanium-alloy', 'combustible-unit', 'plastic', 'organic-crystal', 'graphene', 'annihilation-constraint-sphere', 'magnum-ammo-box', 'supersonic-missile-set', 'optical-grating-crystal'],
-        ['steel','circuit-board','prism', 'electric-motor', 'microcrystalline-component', null, 'explosive-unit','strange-matter', 'titanium-crystal', 'carbon-nanotube', 'particle-broadband', 'titanium-ammo-box', 'gravity-missile-set','spiniform-crystal'],
-        ['gear','plasma-exciter','photon-combiner','electromagnetic-turbine','processor',null,'crystal-explosive-unit','casimir-crystal','titanium-glass','plane-filter','quantum-chip','superalloy-ammo-box','shell-set', 'unipolar-magnet'],
-        ['thruster','fuel-thruster','ion-thruster','super-magnetic-ring','particle-container', null, null, null, null, null, null,'plasma-capsule','high-explosive-shell-set', 'fire-ice'],
+        ['steel','circuit-board','prism', 'electric-motor', 'microcrystalline-component', 'pro-mk1', 'explosive-unit','strange-matter', 'titanium-crystal', 'carbon-nanotube', 'particle-broadband', 'titanium-ammo-box', 'gravity-missile-set','spiniform-crystal'],
+        ['gear','plasma-exciter','photon-combiner','electromagnetic-turbine','processor','pro-mk2','crystal-explosive-unit','casimir-crystal','titanium-glass','plane-filter','quantum-chip','superalloy-ammo-box','shell-set', 'unipolar-magnet'],
+        ['thruster','fuel-thruster','ion-thruster','super-magnetic-ring','particle-container', 'pro-mk3', null, null, null, null, null,'plasma-capsule','high-explosive-shell-set', 'fire-ice'],
         [null, null, null, null, 'graviton-lens', null, null, 'solar-sail', 'frame-material', 'dyson-sphere-component', 'small-carrier-rocket', 'antimatter-capsule','crystal-shell-set', 'log' ],
         ['electromagnetic-matrix', 'energy-matrix', 'structure-matrix', 'information-matrix', 'gravity-matrix', 'universe-matrix', 'storage-unit','energy-shard', 'silicon-based-neuron','negentropy-singularity','matter-recombinator', 'em-jamming-capsule', 'em-suppression-capsule', 'plant-fuel'  ]
       ],

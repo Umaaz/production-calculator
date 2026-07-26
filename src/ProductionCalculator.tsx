@@ -4,7 +4,7 @@ import ReactDOM from 'react-dom';
 import type { ProdRecipe, ProdItem, GameData, PickerTab } from './gameTypes';
 import {
   GameDataCtx, useGameData, useDropdown,
-  SpriteIcon, TierPicker, ModifierPicker, PowerPlantPicker, PowerFuelPicker,
+  SpriteIcon, TierPicker, ModifierPicker, PowerPlantPicker, PowerFuelPicker, RecipeTooltip,
 } from './calcShared';
 import {
   collectPaths, findTier, buildTree, aggregate, fmt, fmtPower,
@@ -110,14 +110,16 @@ function LayoutItemPicker({ items, selectedId, onSelect, layout, itemById }: {
   layout: PickerTab[];
   itemById: Record<string, ProdItem>;
 }) {
+  const { recipeByOutput } = useGameData();
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
+  const [tip, setTip] = useState<{ item: ProdItem; x: number; y: number } | null>(null);
 
   const selected = items.find(it => it.id === selectedId) ?? items[0];
   const craftableSet = useMemo(() => new Set(items.map(it => it.id)), [items]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) { setTip(null); return; }
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
@@ -126,7 +128,7 @@ function LayoutItemPicker({ items, selectedId, onSelect, layout, itemById }: {
   const panel = open ? ReactDOM.createPortal(
     <>
       <div className="dsp-picker-backdrop" onClick={() => setOpen(false)} />
-      <div className="dsp-picker-panel">
+      <div className="dsp-picker-panel" onMouseLeave={() => setTip(null)}>
         <div className="dsp-picker-tabs">
           {layout.map((tab, i) => (
             <button key={i}
@@ -147,9 +149,12 @@ function LayoutItemPicker({ items, selectedId, onSelect, layout, itemById }: {
                 }
                 const craftable = craftableSet.has(item.id);
                 return (
-                  <button key={ci} title={item.name} disabled={!craftable}
+                  <button key={ci} disabled={!craftable}
                     className={`dsp-picker-cell${!craftable ? ' dsp-picker-cell--raw' : ''}${craftable && item.id === selected?.id ? ' is-selected' : ''}`}
-                    onClick={craftable ? () => { onSelect(item.id); setOpen(false); } : undefined}>
+                    onClick={craftable ? () => { onSelect(item.id); setOpen(false); } : undefined}
+                    onMouseEnter={e => setTip({ item, x: e.clientX + 14, y: e.clientY + 14 })}
+                    onMouseMove={e => setTip({ item, x: e.clientX + 14, y: e.clientY + 14 })}
+                    onMouseLeave={() => setTip(null)}>
                     <SpriteIcon spriteId={item.spriteId} fallback={item.icon} size={46} />
                   </button>
                 );
@@ -158,6 +163,9 @@ function LayoutItemPicker({ items, selectedId, onSelect, layout, itemById }: {
           ))}
         </div>
       </div>
+      {tip && recipeByOutput[tip.item.id] && (
+        <RecipeTooltip recipe={recipeByOutput[tip.item.id]} itemId={tip.item.id} x={tip.x} y={tip.y} />
+      )}
     </>,
     document.body
   ) : null;
@@ -286,6 +294,8 @@ function TreeRow({ node, depth, expanded, toggle }: {
   const beltExact = node.rate / beltCapacity;
   const beltCount = Math.ceil(beltExact - 1e-9);
   const isChecked = checked.has(node.path);
+  const [tipPos, setTipPos] = useState<{ x: number; y: number } | null>(null);
+  const showTip = node.recipe && !node.oilOptimised && !node.manuallyMined;
 
   return (
     <>
@@ -299,8 +309,18 @@ function TreeRow({ node, depth, expanded, toggle }: {
           >
             {hasChildren ? (isOpen ? '▾' : '▸') : '•'}
           </button>
-          <SpriteIcon spriteId={item?.spriteId} fallback={item?.icon ?? '❓'} size={22} className="tree-icon" />
-          <span className="tree-name">{item?.name ?? node.itemId}</span>
+          <span
+            className="tree-item-label"
+            onMouseEnter={e => showTip && setTipPos({ x: e.clientX + 14, y: e.clientY + 14 })}
+            onMouseMove={e => showTip && setTipPos({ x: e.clientX + 14, y: e.clientY + 14 })}
+            onMouseLeave={() => setTipPos(null)}
+          >
+            <SpriteIcon spriteId={item?.spriteId} fallback={item?.icon ?? '❓'} size={22} className="tree-icon" />
+            <span className="tree-name">{item?.name ?? node.itemId}</span>
+          </span>
+          {tipPos && node.recipe && (
+            <RecipeTooltip recipe={node.recipe} itemId={node.itemId} x={tipPos.x} y={tipPos.y} />
+          )}
           {depth > 0 && node.recipe && !node.oilOptimised && (
             <button
               className="tree-open-btn"
@@ -454,6 +474,8 @@ export function ProductionCalculator({ gameId, gameData, gameLabel, gameIcon, ga
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const [selfSprayProlif, setSelfSprayProlif] = usePersisted(K('selfSprayProlif'), false);
+
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const [defaultTierIds, setDefaultTierIds] = usePersisted<Record<string, string>>(K('defaultTierIds'), () => {
@@ -585,6 +607,8 @@ export function ProductionCalculator({ gameId, gameData, gameLabel, gameIcon, ga
     const tiers = features.proliferatorTiers;
     if (!tiers?.length || !tree) return null;
     const result: Record<string, number> = {};
+    const cap = (tier: typeof tiers[number]) =>
+      selfSprayProlif ? (tier.selfSprayCapacity ?? tier.sprayCapacity) : tier.sprayCapacity;
 
     const walk = (node: TreeNode) => {
       if (!node.manuallyMined && !node.cyclic && !node.oilOptimised && node.recipe) {
@@ -592,7 +616,7 @@ export function ProductionCalculator({ gameId, gameData, gameLabel, gameIcon, ga
         if (tier) {
           const inputPerMin = node.children.reduce((s, c) => s + c.rate, 0);
           if (inputPerMin > 0)
-            result[tier.idPrefix] = (result[tier.idPrefix] ?? 0) + inputPerMin / tier.sprayCapacity;
+            result[tier.idPrefix] = (result[tier.idPrefix] ?? 0) + inputPerMin / cap(tier);
         }
       }
       node.children.forEach(walk);
@@ -605,7 +629,7 @@ export function ProductionCalculator({ gameId, gameData, gameLabel, gameIcon, ga
       const addOil = (modId: string, itemsPerMin: number) => {
         const tier = tiers.find(t => modId.startsWith(t.idPrefix + '-'));
         if (tier && itemsPerMin > 0)
-          result[tier.idPrefix] = (result[tier.idPrefix] ?? 0) + itemsPerMin / tier.sprayCapacity;
+          result[tier.idPrefix] = (result[tier.idPrefix] ?? 0) + itemsPerMin / cap(tier);
       };
       if (sol.p > 0) addOil(oilModifiers.plasma,   sol.crudeInput / mults.plasma.prod);
       if (sol.f > 0) addOil(oilModifiers.reformed, 4 * sol.f);
@@ -613,7 +637,7 @@ export function ProductionCalculator({ gameId, gameData, gameLabel, gameIcon, ga
     }
 
     return Object.keys(result).length > 0 ? result : null;
-  }, [tree, features.proliferatorTiers, treeOilSolution, modifierOptions, oilModifiers]);
+  }, [tree, features.proliferatorTiers, treeOilSolution, modifierOptions, oilModifiers, selfSprayProlif]);
 
   const [selectedPowerPlantId, setSelectedPowerPlantId] = usePersisted(K('powerPlantId'), powerPlants[0]?.id ?? '');
   const [selectedPowerFuelId,  setSelectedPowerFuelId]  = usePersisted(K('powerFuelId'),  powerFuels[0]?.id ?? '');
@@ -815,7 +839,14 @@ export function ProductionCalculator({ gameId, gameData, gameLabel, gameIcon, ga
             <div id="calc-summary">
               {prolifTotals && features.proliferatorTiers && (
                 <div className="summary-block">
-                  <div className="summary-title">Proliferators / min</div>
+                  <div className="summary-title">
+                    Proliferators / min
+                    <button
+                      className={`prolif-selfspray-btn${selfSprayProlif ? ' active' : ''}`}
+                      onClick={() => setSelfSprayProlif((v: boolean) => !v)}
+                      title={selfSprayProlif ? 'Self-spray ON: using boosted spray capacity' : 'Self-spray OFF: click to account for proliferators sprayed with Extra Products'}
+                    >⊕ self-spray</button>
+                  </div>
                   {features.proliferatorTiers.filter(t => prolifTotals[t.idPrefix] != null).map(t => (
                     <div key={t.idPrefix} className="summary-row">
                       <SpriteIcon spriteId={t.spriteId} fallback="🧪" size={20} />
