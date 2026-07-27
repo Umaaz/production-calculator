@@ -1,6 +1,8 @@
 import React, { useRef, useEffect, useCallback, useMemo, useState } from 'react';
 import type { GameData, LayoutMachineSpec } from './gameTypes';
 import type { TreeNode } from './treeLogic';
+import { buildEntities, MAX_ARM_TILES } from './layoutEntities';
+import type { PlacedEntity, TileGroup, TileBelt } from './layoutEntities';
 
 // ── Sprite sheet rendering ────────────────────────────────────────────────────
 // Sprites are CSS-driven via data-icon="${ns}.${id}". We read background-position
@@ -67,8 +69,6 @@ const DEFAULT_TILE_SIZE = 20;   // px per game tile (zoom base)
 const STAGE_GAP         = 8;    // tiles between production stages (horizontal)
 const GROUP_GAP         = 4;    // tiles between groups within the same stage
 const BELT_W_FRAC       = 0.35; // belt line width as fraction of tile size
-const SIDE_EXT          = 1;    // belt extends 1 tile past machine block each side
-const MAX_ARM_TILES     = 3;    // sorter arm max length in tiles
 
 // Given a group's machine count, per-machine capacity rate (items/min at full speed),
 // and belt throughput, compute cols/rows that keep each row within belt capacity
@@ -134,63 +134,6 @@ interface LEdge {
   toId: string;
   itemId: string;
   rate: number;
-}
-
-/** A group expanded to a placed tile bounding box. */
-interface TileGroup {
-  id: string;
-  itemId: string;
-  machineId: string;
-  tierId: string;
-  level: number;              // stage column (0 = raw inputs, max = root output)
-  count: number;
-  rate: number;
-  capacityPerMachine: number; // items/min per machine at full speed (rate / exactCount)
-  maxPerBelt: number;         // how many machines one belt lane can serve
-  isRaw: boolean;
-  mW: number;               // per-machine tile width
-  mH: number;               // per-machine tile height
-  cols: number;             // machines per row (horizontal)
-  rows: number;             // machine rows (stacked vertically)
-  tileX: number;
-  tileY: number;
-  totalW: number;           // bounding box in tiles
-  totalH: number;
-  // Belt lane breakdown (all ≤ MAX_ARM_TILES = 3 per side):
-  topInputBelts: number;    // input belt lanes above machine  (= topPad)
-  outputBelts: number;      // output belt lanes below machine, CLOSEST (depth 1..outputBelts)
-  bottomInputBelts: number; // overflow input lanes below machine, OUTSIDE outputs (depth outputBelts+1..)
-  topPad: number;           // = topInputBelts
-  botPad: number;           // = outputBelts + bottomInputBelts
-  innerGap: number;         // = topPad + botPad
-  sideExt: number;          // tiles the belt extends past machines on each side
-  beltAccess: string;
-  // Ordered input items: index 0 = top lane closest to machine (arm=1), index topInputBelts-1 = farthest top lane
-  // then bottomInputBelts overflow items follow
-  inputItems: string[];     // itemIds in belt-lane order (top lanes first, then bottom overflow)
-  // Belt hook-up points (tile coords, vertical centre of belt on that edge)
-  // Input enters from left of the topmost input belt; output exits from right of the bottommost output belt.
-  outX: number; outY: number;
-  inX: number;  inY: number;
-}
-
-/** One individual machine within a group. */
-interface TileMachine {
-  groupId: string;
-  index: number;
-  tileX: number;
-  tileY: number;
-  mW: number;
-  mH: number;
-}
-
-/** Orthogonal belt path connecting two groups. */
-interface TileBelt {
-  fromId: string;
-  toId: string;
-  itemId: string;
-  rate: number;
-  pts: Array<{ x: number; y: number }>;
 }
 
 // ── Machine colours ───────────────────────────────────────────────────────────
@@ -311,29 +254,6 @@ function computeLayout(
   });
   const maxLevel = groups.reduce((m, g) => Math.max(m, g.level), 0);
 
-  // Column widths (widest group in each level)
-  const colW: number[] = [];
-  for (let l = 0; l <= maxLevel; l++) {
-    let maxW = 0;
-    (byLevel.get(l) ?? []).forEach(g => {
-      const spec = specs.get(g.machineId);
-      const mW   = spec?.tileW ?? 3;
-      const cap = g.exactCount > 0 ? g.rate / g.exactCount : 0;
-      const { cols } = calcColsRows(g.count, cap, beltThroughput);
-      const w    = SIDE_EXT + cols * mW + SIDE_EXT;
-      if (w > maxW) maxW = w;
-    });
-    colW[l] = maxW;
-  }
-
-  // Column x starts
-  const colX: number[] = [];
-  let cx = 3;
-  for (let l = 0; l <= maxLevel; l++) {
-    colX[l] = cx;
-    cx += colW[l] + STAGE_GAP;
-  }
-
   // Collect actual input items per group in edge order (recipe-specific)
   const actualInItems = new Map<string, string[]>();
   edges.forEach(e => {
@@ -341,10 +261,21 @@ function computeLayout(
     actualInItems.get(e.toId)!.push(e.itemId);
   });
 
-  const tileGroups: TileGroup[] = [];
-  const levelY = new Map<number, number>();
-  for (let l = 0; l <= maxLevel; l++) levelY.set(l, 3);
+  // ── Pass 1: per-group footprint metrics ──────────────────────────────────
+  // Column widths and final placement must agree on the same margins, so the
+  // sizing maths lives here once rather than being repeated per call site.
+  interface Metrics {
+    mW: number; mH: number; ba: string;
+    cols: number; rows: number; maxPerBelt: number; capacityPerMachine: number;
+    topIb: number; botIb: number; ob: number;
+    tp: number; bp: number; ig: number;
+    leftExt: number; rightExt: number;
+    totalW: number; totalH: number;
+    count: number;
+    inputItems: string[];
+  }
 
+  const metrics = new Map<string, Metrics>();
   groups.forEach(g => {
     const spec   = specs.get(g.machineId);
     const mW     = spec?.tileW ?? 3;
@@ -363,15 +294,54 @@ function computeLayout(
     const tp     = topIb;
     const bp     = ob + botIb;
     const ig     = tp + bp;
-    const count = Math.max(1, g.count);
+    const count  = Math.max(1, g.count);
     const capacityPerMachine = g.exactCount > 0 ? g.rate / g.exactCount : 0;
     const { cols, rows, maxPerBelt } = calcColsRows(count, capacityPerMachine, beltThroughput);
-    const totalW = SIDE_EXT + cols * mW + SIDE_EXT;
+    // Each belt lane needs its own spine column in the side margin when the
+    // group spans multiple rows — sharing a column would put two buildings in
+    // one tile. Inputs (including bottom overflow) split left, outputs right.
+    const leftExt  = Math.max(1, topIb + botIb);
+    const rightExt = Math.max(1, ob);
+    const totalW = leftExt + cols * mW + rightExt;
     const totalH = tp + rows * mH + Math.max(0, rows - 1) * ig + bp;
+
+    metrics.set(g.id, {
+      mW, mH, ba, cols, rows, maxPerBelt, capacityPerMachine,
+      topIb, botIb, ob, tp, bp, ig, leftExt, rightExt, totalW, totalH, count,
+      inputItems: allInputItems.slice(0, topIb + botIb),
+    });
+  });
+
+  // Column widths (widest group in each level)
+  const colW: number[] = [];
+  for (let l = 0; l <= maxLevel; l++) {
+    let maxW = 0;
+    (byLevel.get(l) ?? []).forEach(g => {
+      const w = metrics.get(g.id)!.totalW;
+      if (w > maxW) maxW = w;
+    });
+    colW[l] = maxW;
+  }
+
+  // Column x starts
+  const colX: number[] = [];
+  let cx = 3;
+  for (let l = 0; l <= maxLevel; l++) {
+    colX[l] = cx;
+    cx += colW[l] + STAGE_GAP;
+  }
+
+  // ── Pass 2: placement ────────────────────────────────────────────────────
+  const tileGroups: TileGroup[] = [];
+  const levelY = new Map<number, number>();
+  for (let l = 0; l <= maxLevel; l++) levelY.set(l, 3);
+
+  groups.forEach(g => {
+    const m = metrics.get(g.id)!;
 
     const autoX = colX[g.level];
     const autoY = levelY.get(g.level) ?? 3;
-    levelY.set(g.level, autoY + totalH + GROUP_GAP);
+    levelY.set(g.level, autoY + m.totalH + GROUP_GAP);
 
     const ov    = overrides[g.id];
     const tileX = ov?.tileX ?? autoX;
@@ -381,17 +351,19 @@ function computeLayout(
     // Output exits from right of the bottommost output belt (tileY + totalH - 1)
     const inX  = tileX;
     const inY  = tileY + 0.5;
-    const outX = tileX + totalW;
-    const outY = tileY + totalH - 0.5;
+    const outX = tileX + m.totalW;
+    const outY = tileY + m.totalH - 0.5;
 
     tileGroups.push({
       id: g.id, itemId: g.itemId, machineId: g.machineId, tierId: g.tierId,
-      level: g.level, count, rate: g.rate, capacityPerMachine, maxPerBelt, isRaw: g.isRaw,
-      mW, mH, cols, rows,
-      tileX, tileY, totalW, totalH,
-      topInputBelts: topIb, outputBelts: ob, bottomInputBelts: botIb,
-      topPad: tp, botPad: bp, innerGap: ig, sideExt: SIDE_EXT, beltAccess: ba,
-      inputItems: allInputItems.slice(0, topIb + botIb),
+      level: g.level, count: m.count, rate: g.rate,
+      capacityPerMachine: m.capacityPerMachine, maxPerBelt: m.maxPerBelt, isRaw: g.isRaw,
+      mW: m.mW, mH: m.mH, cols: m.cols, rows: m.rows,
+      tileX, tileY, totalW: m.totalW, totalH: m.totalH,
+      topInputBelts: m.topIb, outputBelts: m.ob, bottomInputBelts: m.botIb,
+      topPad: m.tp, botPad: m.bp, innerGap: m.ig,
+      leftExt: m.leftExt, rightExt: m.rightExt, beltAccess: m.ba,
+      inputItems: m.inputItems,
       outX, outY, inX, inY,
     });
   });
@@ -484,25 +456,6 @@ function computeLayout(
   return { tileGroups, belts };
 }
 
-/** Expand tile groups into individual placed machines. */
-function getMachines(tileGroups: TileGroup[]): TileMachine[] {
-  return tileGroups.flatMap(g => {
-    if (g.isRaw) return [];
-    return Array.from({ length: g.count }, (_, i) => {
-      const col = i % g.cols;
-      const row = Math.floor(i / g.cols);
-      return {
-        groupId: g.id, index: i,
-        // Machines start after sideExt (belt extension) horizontally
-        // and after topPad (belt + arm) vertically
-        tileX: g.tileX + g.sideExt + col * g.mW,
-        tileY: g.tileY + g.topPad  + row * (g.mH + g.innerGap),
-        mW: g.mW, mH: g.mH,
-      };
-    });
-  });
-}
-
 // ── Belt lane annotation helpers ─────────────────────────────────────────────
 
 /** Icon in the left sideExt tile + item name right-aligned just outside the left belt edge. */
@@ -547,16 +500,16 @@ function annotateInputBelt(
   ctx.textBaseline = 'alphabetic';
 }
 
-/** Icon at the right end of the output belt lane. */
+/** Icon drawn in the last tile of an output belt lane (items exit right). */
 function annotateOutputBelt(
   ctx: CanvasRenderingContext2D,
   gameData: GameData,
-  itemId: string,
-  beltLeft: number, beltTop: number, beltW: number,
+  itemId: string | undefined,
+  beltLeft: number, beltTop: number,
   ts: number,
   onNeedLoad: (url: string) => void,
 ) {
-  if (ts < 10) return;
+  if (!itemId || ts < 10) return;
   const item = gameData.itemById[itemId];
   if (!item) return;
 
@@ -565,209 +518,109 @@ function annotateOutputBelt(
 
   if (item.spriteId !== undefined) {
     tryDrawSprite(ctx, gameData.iconNamespace, item.spriteId,
-      beltLeft + beltW - ts + iOff, beltTop + iOff, iconSz, iconSz, onNeedLoad);
+      beltLeft + iOff, beltTop + iOff, iconSz, iconSz, onNeedLoad);
   } else {
     ctx.font         = `${iconSz * 0.85}px system-ui,sans-serif`;
     ctx.fillStyle    = 'rgba(200,220,255,0.9)';
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(item.icon ?? '?', beltLeft + beltW - ts / 2, beltTop + ts / 2);
+    ctx.fillText(item.icon ?? '?', beltLeft + ts / 2, beltTop + ts / 2);
   }
 
   ctx.textAlign    = 'left';
   ctx.textBaseline = 'alphabetic';
 }
 
-// ── Belt lanes + sorter/inserter arms ─────────────────────────────────────────
+// ── Entity rendering ──────────────────────────────────────────────────────────
 
 /**
- * Draw horizontal belt lanes and sorter arms for every non-raw, non-direct group.
+ * Draw the tile-discrete entities inside every group: belt lanes, sorter arms,
+ * and the vertical split/merge spines.
  *
- * Per machine row r, the tile layout is:
- *   [inputBelts tiles]   input belt lanes (belt N farthest, belt 1 closest)
- *   [mH tiles]           machine footprint
- *   [outputBelts tiles]  output belt lanes (belt 1 closest, belt M farthest)
- *
- * innerGap = inputBelts + outputBelts so consecutive rows share the same space.
- * Arm for input belt k (k=1 closest): length = k tiles, spread evenly across mW.
- * Arm for output belt m (m=1 closest): length = m tiles.
+ * All geometry comes from buildEntities() so the canvas and the blueprint
+ * exporter cannot disagree about where anything sits. This function only knows
+ * how to paint a cell.
  */
-function drawGroupBelts(
+function drawEntities(
   ctx: CanvasRenderingContext2D,
-  tileGroups: TileGroup[],
+  entities: PlacedEntity[],
   gameData: GameData,
   vx: number, vy: number, ts: number,
   onNeedLoad: (url: string) => void,
 ) {
-  const laneFill   = 'rgba(20, 40, 90, 0.72)';
-  const laneStroke = 'rgba(50, 90, 180, 0.5)';
-  const armFill    = 'rgba(10, 50, 20, 0.7)';
-  const armStroke  = '#2fb34a';
-  const armW       = ts; // 1 tile wide
-
-  tileGroups.forEach(g => {
-    if (g.isRaw || g.beltAccess === 'direct') return;
-    if (g.topInputBelts === 0 && g.outputBelts === 0 && g.bottomInputBelts === 0) return;
-
-    const px = tp(g.tileX, vx, ts);
-    tp(g.tileY, vy, ts);
-    const pw = g.totalW * ts;
-    const { topInputBelts: tib, outputBelts: ob, bottomInputBelts: bib,
-            innerGap, sideExt, mW, mH, rows, cols, count } = g;
-
-    for (let r = 0; r < rows; r++) {
-      const blockTileY   = g.tileY + r * (mH + innerGap);
-      const machTopTileY = blockTileY + tib;          // top of machine
-      const machBotTileY = machTopTileY + mH;         // bottom of machine
-      const machTopPy    = tp(machTopTileY, vy, ts);
-      const machBotPy    = tp(machBotTileY, vy, ts);
-
-      // ── Top input belt lanes ───────────────────────────────────────────
-      // Belt k=1 is closest to machine (tileY = machTop-1), k=tib is farthest.
-      ctx.fillStyle = laneFill; ctx.strokeStyle = laneStroke; ctx.lineWidth = 1;
-      for (let k = 1; k <= tib; k++) {
-        const beltPy = tp(machTopTileY - k, vy, ts);
-        ctx.fillRect(px, beltPy, pw, ts);
-        ctx.strokeRect(px, beltPy, pw, ts);
-        // Annotate only once (row 0) to avoid repetition
-        if (r === 0) annotateInputBelt(ctx, gameData, g.inputItems[k - 1], px, beltPy, ts, onNeedLoad);
-      }
-
-      // ── Bottom output belt lanes (closest to machine, depth 1..ob) ────
-      for (let m = 1; m <= ob; m++) {
-        const beltPy = tp(machBotTileY + (m - 1), vy, ts);
-        ctx.fillRect(px, beltPy, pw, ts);
-        ctx.strokeRect(px, beltPy, pw, ts);
-        // Output annotation: icon at right end (items exit right)
-        if (r === rows - 1) annotateOutputBelt(ctx, gameData, g.itemId, px, beltPy, pw, ts, onNeedLoad);
-      }
-
-      // ── Bottom overflow input belt lanes (outside outputs, depth ob+1..) ─
-      for (let k = 1; k <= bib; k++) {
-        const beltPy = tp(machBotTileY + ob + (k - 1), vy, ts);
-        ctx.fillRect(px, beltPy, pw, ts);
-        ctx.strokeRect(px, beltPy, pw, ts);
-        if (r === 0) annotateInputBelt(ctx, gameData, g.inputItems[tib + k - 1], px, beltPy, ts, onNeedLoad);
-      }
-
-      if (ts < 10) continue;
-
-      // ── Sorter arms ───────────────────────────────────────────────────
-      ctx.fillStyle = armFill; ctx.strokeStyle = armStroke; ctx.lineWidth = 1.5;
-
-      const machinesInRow = Math.min(cols, count - r * cols);
-      for (let c = 0; c < machinesInRow; c++) {
-        const machLeft = g.tileX + sideExt + c * mW;
-
-        // Top input arms: arm k reaches k tiles upward, spread across machine width
-        for (let k = 1; k <= tib; k++) {
-          const armCx = tp(machLeft + (k - 0.5) * mW / Math.max(tib, 1), vx, ts);
-          const armH  = k * ts;
-          rRect(ctx, armCx - armW / 2, machTopPy - armH, armW, armH, armW * 0.25);
-          ctx.fill(); ctx.stroke();
-        }
-
-        // Bottom output arms: arm m reaches m tiles downward
-        for (let m = 1; m <= ob; m++) {
-          const armCx = tp(machLeft + (m - 0.5) * mW / Math.max(ob, 1), vx, ts);
-          const armH  = m * ts;
-          rRect(ctx, armCx - armW / 2, machBotPy, armW, armH, armW * 0.25);
-          ctx.fill(); ctx.stroke();
-        }
-
-        // Bottom overflow input arms: arm k' reaches (ob + k') tiles downward
-        for (let k = 1; k <= bib; k++) {
-          const armCx = tp(machLeft + (k - 0.5) * mW / Math.max(bib, 1), vx, ts);
-          const armH  = (ob + k) * ts;
-          rRect(ctx, armCx - armW / 2, machBotPy, armW, armH, armW * 0.25);
-          ctx.fill(); ctx.stroke();
-        }
-      }
-    }
-
-  });
-}
-
-// ── Splitter / merger spines ───────────────────────────────────────────────────
-//
-// When rows > 1, a single incoming belt must be split across all machine rows
-// (input side) and the per-row output belts must be merged back into one (output
-// side).  This function draws:
-//   • A vertical "spine" belt inside the left/right sideExt for each lane.
-//   • A splitter/merger icon (⊕) at each row junction on that spine.
-//
-// The spine color is intentionally distinct (bright-cyan border) so it reads
-// differently from the regular dark-blue belt lane fill.
-function drawSplitMerge(
-  ctx: CanvasRenderingContext2D,
-  tileGroups: TileGroup[],
-  vx: number, vy: number, ts: number,
-) {
+  const laneFill    = 'rgba(20, 40, 90, 0.72)';
+  const laneStroke  = 'rgba(50, 90, 180, 0.5)';
+  const armFill     = 'rgba(10, 50, 20, 0.7)';
+  const armStroke   = '#2fb34a';
   const spineFill   = 'rgba(15, 55, 120, 0.96)';
   const spineStroke = 'rgba(50, 180, 220, 0.85)';
   const iconFill    = 'rgba(10, 45, 100, 1)';
   const iconStroke  = '#38d4f0';
 
-  // Helper: draw a vertical spine from topTileY..botTileY+1 at spineX,
-  // with ⊕ icons at each of iconTileYs.
-  function drawSpine(spineX: number, topTileY: number, botTileY: number, iconTileYs: number[]) {
-    const sx  = tp(spineX, vx, ts);
-    const sy0 = tp(topTileY,     vy, ts);
-    const sy1 = tp(botTileY + 1, vy, ts);
+  // Belt tiles first so arms and splitters paint over them.
+  ctx.fillStyle = laneFill; ctx.strokeStyle = laneStroke; ctx.lineWidth = 1;
+  entities.forEach(e => {
+    if (e.kind !== 'belt') return;
+    const px = tp(e.x, vx, ts);
+    const py = tp(e.y, vy, ts);
+    ctx.fillRect(px, py, ts, ts);
+    ctx.strokeRect(px, py, ts, ts);
+  });
 
-    ctx.fillStyle   = spineFill;
-    ctx.strokeStyle = spineStroke;
-    ctx.lineWidth   = 1.5;
-    ctx.fillRect(sx, sy0, ts, sy1 - sy0);
-    ctx.strokeRect(sx, sy0, ts, sy1 - sy0);
+  // Spine tiles use a brighter border so they read as vertical distribution.
+  ctx.fillStyle = spineFill; ctx.strokeStyle = spineStroke; ctx.lineWidth = 1.5;
+  entities.forEach(e => {
+    if (e.kind !== 'splitter') return;
+    const px = tp(e.x, vx, ts);
+    const py = tp(e.y, vy, ts);
+    ctx.fillRect(px, py, ts, ts);
+    ctx.strokeRect(px, py, ts, ts);
+  });
 
-    for (const iy of iconTileYs) {
-      const isy = tp(iy, vy, ts);
+  if (ts >= 10) {
+    // Sorter arms — drawn from the belt tile toward the machine.
+    ctx.fillStyle = armFill; ctx.strokeStyle = armStroke; ctx.lineWidth = 1.5;
+    entities.forEach(e => {
+      if (e.kind !== 'sorter') return;
+      const len  = e.armLen ?? 1;
+      const px   = tp(e.x, vx, ts);
+      // dir 2 (S) reaches downward from this tile; dir 0 (N) reaches upward.
+      const py   = e.dir === 0
+        ? tp(e.y - len + 1, vy, ts)
+        : tp(e.y, vy, ts);
+      rRect(ctx, px, py, ts, len * ts, ts * 0.25);
+      ctx.fill(); ctx.stroke();
+    });
+
+    // Splitter/merger markers.
+    entities.forEach(e => {
+      if (e.kind !== 'splitter') return;
+      const px  = tp(e.x, vx, ts);
+      const py  = tp(e.y, vy, ts);
       const pad = ts * 0.1;
       ctx.fillStyle   = iconFill;
       ctx.strokeStyle = iconStroke;
       ctx.lineWidth   = 1.5;
-      rRect(ctx, sx + pad, isy + pad, ts - 2 * pad, ts - 2 * pad, ts * 0.28);
+      rRect(ctx, px + pad, py + pad, ts - 2 * pad, ts - 2 * pad, ts * 0.28);
       ctx.fill(); ctx.stroke();
       if (ts >= 12) {
-        ctx.font          = `bold ${Math.max(8, Math.floor(ts * 0.52))}px system-ui,sans-serif`;
-        ctx.fillStyle     = '#a0e8ff';
-        ctx.textAlign     = 'center';
-        ctx.textBaseline  = 'middle';
-        ctx.fillText('⊕', sx + ts / 2, isy + ts / 2);
+        ctx.font         = `bold ${Math.max(8, Math.floor(ts * 0.52))}px system-ui,sans-serif`;
+        ctx.fillStyle    = '#a0e8ff';
+        ctx.textAlign    = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('⊕', px + ts / 2, py + ts / 2);
         ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
       }
-    }
+    });
   }
 
-  tileGroups.forEach(g => {
-    if (g.isRaw || g.rows < 2 || g.beltAccess === 'direct') return;
-
-    const { tileX, tileY, rows, mH, innerGap: ig,
-            topInputBelts: tib, outputBelts: ob, sideExt, totalW } = g;
-
-    // ── Input splitters (left sideExt) ──────────────────────────────────────
-    // Belt k=1 is closest to machine → innermost spine (tileX + sideExt - 1).
-    // Belt k=2 is next → one tile further left (tileX + sideExt - 2), etc.
-    for (let k = 1; k <= tib; k++) {
-      const spineX = tileX + Math.max(0, sideExt - k);
-      const rowYs  = Array.from({ length: rows }, (_, r) =>
-        tileY + r * (mH + ig) + tib - k,    // tile-top of belt-k in row r
-      );
-      // Splitter icon at rows 0..N-2 (each is a fork point; last row just terminates).
-      drawSpine(spineX, rowYs[0], rowYs[rows - 1], rowYs.slice(0, -1));
-    }
-
-    // ── Output mergers (right sideExt) ──────────────────────────────────────
-    // Output belt m=1 is closest to machine → innermost on right side.
-    for (let m = 1; m <= ob; m++) {
-      const spineX = tileX + totalW - sideExt + Math.min(m - 1, sideExt - 1);
-      const rowYs  = Array.from({ length: rows }, (_, r) =>
-        tileY + r * (mH + ig) + tib + mH + m - 1,  // tile-top of output-m in row r
-      );
-      // Merger icon at rows 1..N-1 (each feeds into the combined output above it).
-      drawSpine(spineX, rowYs[0], rowYs[rows - 1], rowYs.slice(1));
-    }
+  // Lane labels last so nothing paints over them.
+  entities.forEach(e => {
+    if (e.kind !== 'belt' || !e.annotate) return;
+    const px = tp(e.x, vx, ts);
+    const py = tp(e.y, vy, ts);
+    if (e.annotate === 'in') annotateInputBelt(ctx, gameData, e.itemId, px, py, ts, onNeedLoad);
+    else                     annotateOutputBelt(ctx, gameData, e.itemId, px, py, ts, onNeedLoad);
   });
 }
 
@@ -832,22 +685,19 @@ function drawBelts(ctx: CanvasRenderingContext2D, belts: TileBelt[], vx: number,
 
 function drawMachines(
   ctx: CanvasRenderingContext2D,
-  machines: TileMachine[],
-  tileGroups: TileGroup[],
+  entities: PlacedEntity[],
   gameData: GameData,
   selectedGroupId: string | null,
   vx: number, vy: number, ts: number,
   onNeedLoad: (url: string) => void,
 ) {
-  const byId = new Map(tileGroups.map(g => [g.id, g]));
-
-  machines.forEach(m => {
-    const g = byId.get(m.groupId);
-    if (!g) return;
-    const px = tp(m.tileX, vx, ts);
-    const py = tp(m.tileY, vy, ts);
-    const pw = m.mW * ts;
-    const ph = m.mH * ts;
+  entities.forEach(m => {
+    if (m.kind !== 'machine') return;
+    const g = { machineId: m.machineId ?? '', itemId: m.itemId ?? '' };
+    const px = tp(m.x, vx, ts);
+    const py = tp(m.y, vy, ts);
+    const pw = m.w * ts;
+    const ph = m.h * ts;
     const sel = m.groupId === selectedGroupId;
 
     ctx.fillStyle   = MACHINE_BG[g.machineId]     ?? '#111828';
@@ -883,18 +733,19 @@ function drawMachines(
 
 function drawRawNodes(
   ctx: CanvasRenderingContext2D,
-  tileGroups: TileGroup[],
+  entities: PlacedEntity[],
   gameData: GameData,
   selectedGroupId: string | null,
   vx: number, vy: number, ts: number,
   onNeedLoad: (url: string) => void,
 ) {
-  tileGroups.filter(g => g.isRaw).forEach(g => {
-    const px = tp(g.tileX, vx, ts);
-    const py = tp(g.tileY, vy, ts);
-    const pw = g.totalW * ts;
-    const ph = g.totalH * ts;
-    const sel = g.id === selectedGroupId;
+  entities.forEach(g => {
+    if (g.kind !== 'raw') return;
+    const px = tp(g.x, vx, ts);
+    const py = tp(g.y, vy, ts);
+    const pw = g.w * ts;
+    const ph = g.h * ts;
+    const sel = g.groupId === selectedGroupId;
 
     ctx.fillStyle   = '#090e09';
     ctx.strokeStyle = sel ? '#80b8ff' : '#1a3a1a';
@@ -908,7 +759,7 @@ function drawRawNodes(
     ctx.beginPath(); ctx.arc(px + pw, py + ph / 2, Math.max(2, ts * 0.18), 0, Math.PI * 2); ctx.fill();
 
     if (ts >= 12) {
-      const item   = gameData.itemById[g.itemId];
+      const item   = gameData.itemById[g.itemId ?? ''];
       const iconSz = Math.min(pw, ph) * 0.55;
       const iconX  = px + (pw - iconSz) / 2;
       const iconY  = py + (ph - iconSz) / 2;
@@ -960,13 +811,13 @@ function drawLabels(
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-interface Props { tree: TreeNode; gameData: GameData; }
+interface Props { trees: TreeNode[]; gameData: GameData; }
 
 type Drag =
   | { kind: 'group'; id: string; sx: number; sy: number; ox: number; oy: number }
   | { kind: 'pan';   sx: number; sy: number; ovx: number; ovy: number };
 
-export function LayoutPlanner({ tree, gameData }: Props) {
+export function LayoutPlanner({ trees, gameData }: Props) {
   const canvasRef    = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -999,14 +850,24 @@ export function LayoutPlanner({ tree, gameData }: Props) {
   );
 
   const { groups, edges }       = useMemo(() => {
-    const raw = buildFromTree(tree);
-    return mergeGroups(raw.groups, raw.edges);
-  }, [tree]);
+    const allGroups: LGroup[] = [];
+    const allEdges:  LEdge[]  = [];
+    trees.forEach(tree => {
+      const raw = buildFromTree(tree);
+      allGroups.push(...raw.groups);
+      allEdges.push(...raw.edges);
+    });
+    return mergeGroups(allGroups, allEdges);
+  }, [trees]);
   const { tileGroups, belts }   = useMemo(
     () => computeLayout(groups, edges, specs, overrides, beltThroughput),
     [groups, edges, specs, overrides, beltThroughput],
   );
-  const machines = useMemo(() => getMachines(tileGroups), [tileGroups]);
+  const entities = useMemo(() => buildEntities(tileGroups), [tileGroups]);
+  const machineCount = useMemo(
+    () => entities.reduce((n, e) => n + (e.kind === 'machine' ? 1 : 0), 0),
+    [entities],
+  );
 
   // Resize
   useEffect(() => {
@@ -1031,13 +892,12 @@ export function LayoutPlanner({ tree, gameData }: Props) {
     ctx.fillStyle = '#090912'; ctx.fillRect(0, 0, w, h);
     const { x: vx, y: vy } = viewport;
     drawGrid(ctx, w, h, vx, vy, tileSize);
-    drawGroupBelts(ctx, tileGroups, gameData, vx, vy, tileSize, onNeedLoad);
-    drawSplitMerge(ctx, tileGroups, vx, vy, tileSize);
+    drawEntities(ctx, entities, gameData, vx, vy, tileSize, onNeedLoad);
     drawBelts(ctx, belts, vx, vy, tileSize);
-    drawMachines(ctx, machines, tileGroups, gameData, selectedId, vx, vy, tileSize, onNeedLoad);
-    drawRawNodes(ctx, tileGroups, gameData, selectedId, vx, vy, tileSize, onNeedLoad);
+    drawMachines(ctx, entities, gameData, selectedId, vx, vy, tileSize, onNeedLoad);
+    drawRawNodes(ctx, entities, gameData, selectedId, vx, vy, tileSize, onNeedLoad);
     drawLabels(ctx, tileGroups, gameData, vx, vy, tileSize);
-  }, [tileGroups, machines, belts, selectedId, viewport, tileSize, gameData, size, onNeedLoad]);
+  }, [tileGroups, entities, belts, selectedId, viewport, tileSize, gameData, size, onNeedLoad]);
 
   // Pointer down
   const onPointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -1138,7 +998,7 @@ export function LayoutPlanner({ tree, gameData }: Props) {
             </select>
           );
         })()}
-        <span className="layout-stat">{machines.length} machines · {belts.length} belts · {tileSize}px/tile</span>
+        <span className="layout-stat">{machineCount} machines · {belts.length} belts · {tileSize}px/tile</span>
         <div className="spacer" />
         {sel && (
           <div className="layout-selection-info">

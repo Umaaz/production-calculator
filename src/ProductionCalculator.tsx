@@ -734,14 +734,14 @@ export function ProductionCalculator({ gameId, gameData, gameLabel, gameIcon, ga
             <button className={`calc-tab${activeTab === 'oil' ? ' is-active' : ''}`}
               onClick={() => setActiveTab('oil')}>DSP Oil Optimisation</button>
           )}
-          {trees[0] && (
+          {trees.some(Boolean) && (
             <button className={`calc-tab${activeTab === 'layout' ? ' is-active' : ''}`}
               onClick={() => setActiveTab('layout')}>Layout</button>
           )}
         </div>
 
-        {activeTab === 'layout' && trees[0] ? (
-          <LayoutPlanner tree={trees[0]} gameData={gameData} />
+        {activeTab === 'layout' && trees.some(Boolean) ? (
+          <LayoutPlanner trees={trees.filter(Boolean) as import('./treeLogic').TreeNode[]} gameData={gameData} />
         ) : activeTab === 'oil' && features.oilOptimiser ? (
           <OilOptimiser
             refinerySpeed={(machineTiers['refinery']?.find(t => t.id === defaultTierIds['refinery']) ?? machineTiers['refinery']?.[0])?.speed ?? 1}
