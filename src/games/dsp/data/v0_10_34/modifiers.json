@@ -1,0 +1,16 @@
+{
+  "gameVersion": "0.10.34",
+  "_note": "Proliferator effects. `speed` multiplies craft speed, `productivity` multiplies output quantity, `power` multiplies the machine's draw. A recipe may narrow this list with `modifiers_supported`; absent means all of them are allowed, and a modifier with no effect (speed 1, productivity 1) is always allowed regardless, so \"none\" never needs listing. `fallback` is the modifier to use when this one is not permitted — the extra-products modes fall back to the speed mode of the same tier, so the proliferator is still applied.",
+  "modifiers": [
+    { "id": "none",      "name": "None",                                    "speed": 1,    "productivity": 1,     "power": 1 },
+
+    { "id": "mk1_speed", "name": "Mk.I Proliferator · Speedup",   "item": 1141, "speed": 1.25, "productivity": 1,     "power": 1.3, "sprays": 12 },
+    { "id": "mk1_extra", "name": "Mk.I Proliferator · Extra",     "item": 1141, "speed": 1,    "productivity": 1.125, "power": 1.7, "sprays": 12, "fallback": "mk1_speed" },
+
+    { "id": "mk2_speed", "name": "Mk.II Proliferator · Speedup",  "item": 1142, "speed": 1.5,  "productivity": 1,     "power": 1.7, "sprays": 24 },
+    { "id": "mk2_extra", "name": "Mk.II Proliferator · Extra",    "item": 1142, "speed": 1,    "productivity": 1.2,   "power": 2.4, "sprays": 24, "fallback": "mk2_speed" },
+
+    { "id": "mk3_speed", "name": "Mk.III Proliferator · Speedup", "item": 1143, "speed": 2,    "productivity": 1,     "power": 2.0, "sprays": 60 },
+    { "id": "mk3_extra", "name": "Mk.III Proliferator · Extra",   "item": 1143, "speed": 1,    "productivity": 1.25,  "power": 2.5, "sprays": 60, "fallback": "mk3_speed" }
+  ]
+}

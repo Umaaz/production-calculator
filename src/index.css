@@ -1,8 +1,10 @@
 html, body, #root {
   margin: 0;
   padding: 0;
-  height: 100%;
-  overflow: hidden;
+  /* min-height, not height, and no overflow:hidden — the planner is a normal
+     scrolling page. The fixed-viewport rules here were for the old calculator,
+     which filled the screen and scrolled inside its own panes. */
+  min-height: 100%;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }

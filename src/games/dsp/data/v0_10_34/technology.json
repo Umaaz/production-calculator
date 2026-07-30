@@ -1,0 +1,7 @@
+{
+  "gameVersion": "0.10.34",
+  "_note": "this shows technology that can be used to affect production rates - eg vein utilisation",
+  "technology": [
+    {"id": "vein_utilisation", "name": "Vein utilisation", "base": {"speed": 0.1}, "level_max": 1000}
+  ]
+}
